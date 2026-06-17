@@ -21,11 +21,10 @@
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
-
-  let fbWriting = false; // evita bucle: Firebase->App->Firebase
+  let fbWriting = false;
 
   async function saveToFirebase(col, data) {
-    if(fbWriting) return; // si el cambio vino de Firebase, no reescribir
+    if(fbWriting) return;
     try {
       const batch = db.batch();
       const existing = await db.collection(col).get();
@@ -38,19 +37,25 @@
     } catch(e) { console.error("Firebase save error:", col, e); }
   }
 
+  async function deleteFromFirebase(col, id) {
+    try {
+      await db.collection(col).doc(String(id)).delete();
+    } catch(e) { console.error("Firebase delete error:", col, id, e); }
+  }
+
   function listenCollection(col, setter) {
     return db.collection(col).onSnapshot(snap => {
       if (!snap.empty) {
-        fbWriting = true; // marcar que el cambio viene de Firebase
+        fbWriting = true;
         const data = snap.docs.map(d => ({...d.data(), id: d.id}));
         setter(data);
         localStorage.setItem(col, JSON.stringify(data));
-        setTimeout(() => fbWriting = false, 500); // reset despues de que React procese
+        setTimeout(() => fbWriting = false, 500);
       }
     }, err => console.error("Firebase listen error:", col, err));
   }
 
-  window.dbHelpers = { saveToFirebase, listenCollection };
+  window.dbHelpers = { saveToFirebase, deleteFromFirebase, listenCollection };
 </script>
 </head>
 <body>
@@ -90,17 +95,17 @@ const CATS = {
 const PCFG = {
   "Rin del izq": {
     marcaOpts: ["Fierro", "Aluminio"],
-    tipoRin: ["Union", "Capuchon", "Artilleria"],
+    tipoRin: ["Unemon", "Capuchon", "Artilleria"],
     modeloLabel: "Medida"
   },
   "Rin del der": {
     marcaOpts: ["Fierro", "Aluminio"],
-    tipoRin: ["Union", "Capuchon", "Artilleria"],
+    tipoRin: ["Unemon", "Capuchon", "Artilleria"],
     modeloLabel: "Medida"
   },
   "Rines traseros": {
     marcaOpts: ["Fierro", "Aluminio"],
-    tipoRin: ["Union", "Capuchon", "Artilleria"],
+    tipoRin: ["Unemon", "Capuchon", "Artilleria"],
     modeloLabel: "Medida"
   },
   "Llanta del izq": {
@@ -1811,6 +1816,7 @@ function Camiones({
       variant: "danger",
       onClick: () => {
         if (!confirm("Eliminar camion?")) return;
+        if (window.dbHelpers) window.dbHelpers.deleteFromFirebase("trucks", t.id);
         setTrucks(p => p.filter(x => x.id !== t.id));
       }
     }, "Eliminar")));
@@ -2194,6 +2200,7 @@ function Inventario({
       variant: "danger",
       onClick: () => {
         if (!confirm("Eliminar pieza?")) return;
+        if (window.dbHelpers) window.dbHelpers.deleteFromFirebase("parts", p.id);
         setParts(prev => prev.filter(x => x.id !== p.id));
       }
     }, "Eliminar")));
@@ -2205,132 +2212,17 @@ function Inventario({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "space-y-3"
-  }, /*#__PURE__*/React.createElement(Inp, {
-    label: "Nombre",
-    value: editForm.nombre || "",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      nombre: e.target.value
-    }))
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-2 gap-3"
-  }, /*#__PURE__*/React.createElement(Inp, {
-    label: "Marca",
-    value: editForm.marca || "",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      marca: e.target.value
-    }))
-  }), /*#__PURE__*/React.createElement(Inp, {
-    label: "Modelo/Medida",
-    value: editForm.modelo || "",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      modelo: e.target.value
-    }))
-  })), editForm.libraje !== undefined && /*#__PURE__*/React.createElement(Inp, {
-    label: "Libraje",
-    value: editForm.libraje || "",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      libraje: e.target.value
-    }))
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-3 gap-3"
-  }, /*#__PURE__*/React.createElement(CondSel, {
-    value: editForm.condicion || "B",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      condicion: e.target.value
-    }))
-  }), /*#__PURE__*/React.createElement(Inp, {
-    label: "Precio base $",
-    type: "number",
-    value: editForm.precioBase || "",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      precioBase: e.target.value
-    }))
-  }), /*#__PURE__*/React.createElement(Inp, {
-    label: "Minimo $",
-    type: "number",
-    value: editForm.precioMinimo || "",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      precioMinimo: e.target.value
-    }))
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-2 gap-3"
-  }, /*#__PURE__*/React.createElement(Sel, {
-    label: "Rotacion",
-    value: editForm.rotacion || "media",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      rotacion: e.target.value
-    }))
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "rapida"
-  }, "Rapida"), /*#__PURE__*/React.createElement("option", {
-    value: "media"
-  }, "Media"), /*#__PURE__*/React.createElement("option", {
-    value: "lenta"
-  }, "Lenta")), /*#__PURE__*/React.createElement(Inp, {
-    label: "Cantidad",
-    type: "number",
-    value: editForm.cantidad || 1,
-    min: "1",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      cantidad: Number(e.target.value)
-    }))
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setEditForm(f => ({
-      ...f,
-      _showMapa: true
-    })),
-    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg transition font-bold"
-  }, editForm.ubicacion ? "📍 Seccion " + editForm.ubicacion.seccion : "📍 Ubicacion"), editForm.ubicacion && /*#__PURE__*/React.createElement("button", {
-    onClick: () => setEditForm(f => ({
-      ...f,
-      ubicacion: null
-    })),
-    className: "text-xs text-red-400"
-  }, "Quitar")), editForm._showMapa && /*#__PURE__*/React.createElement(MapaSelector, {
-    value: editForm.ubicacion,
-    onChange: v => setEditForm(f => ({
-      ...f,
-      ubicacion: v,
-      _showMapa: false
-    })),
-    onClose: () => setEditForm(f => ({
-      ...f,
-      _showMapa: false
-    }))
-  }), /*#__PURE__*/React.createElement(Sel, {
-    label: "Disponibilidad",
-    value: editForm.disponibilidad || "por_pieza",
-    onChange: e => setEditForm(f => ({
-      ...f,
-      disponibilidad: e.target.value
-    }))
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "por_pieza"
-  }, "Por pieza"), /*#__PURE__*/React.createElement("option", {
-    value: "con_camion_completo"
-  }, "Solo con camion completo")), /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2 pt-2"
-  }, /*#__PURE__*/React.createElement(Btn, {
-    onClick: saveEditPart,
-    disabled: !editForm.precioBase
-  }, "Guardar cambios"), /*#__PURE__*/React.createElement(Btn, {
-    variant: "ghost",
-    onClick: () => {
+  }, /*#__PURE__*/React.createElement(FormPieza, {
+    form: editForm,
+    setForm: setEditForm,
+    truck: editPart.camionId ? trucks.find(t => t.id === editPart.camionId) : null,
+    onSave: saveEditPart,
+    onCancel: () => {
       setEditPart(null);
       setEditForm(null);
-    }
-  }, "Cancelar")))), editSuelta && /*#__PURE__*/React.createElement(Modal, {
+    },
+    isEdit: true
+  }))), editSuelta && /*#__PURE__*/React.createElement(Modal, {
     title: "Editar: " + editSuelta.nombre,
     onClose: () => {
       setEditSuelta(null);
@@ -3673,7 +3565,6 @@ function App() {
   const [sales, setSales] = useState(() => loadData("sales") ?? SEED_SALES);
   const [user, setUser] = useState(null);
   const [view, setView] = useState("dashboard");
-  // Listeners en tiempo real de Firebase
   useEffect(() => {
     if(!window.dbHelpers) return;
     const unsubs = [
@@ -3685,7 +3576,6 @@ function App() {
     ];
     return () => unsubs.forEach(u => u && u());
   }, []);
-
   useEffect(() => {
     saveData("sellers", sellers);
     if(window.dbHelpers) window.dbHelpers.saveToFirebase("sellers", sellers);
