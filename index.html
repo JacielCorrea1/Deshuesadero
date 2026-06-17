@@ -8,6 +8,3772 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>const {
+  useState,
+  useEffect,
+  useRef
+} = React;
+// Firebase se inicializa en el HTML - estas funciones son legacy para compatibilidad
+function loadData(k) {
+  try {
+    const r = localStorage.getItem(k);
+    return r ? JSON.parse(r) : null;
+  } catch {
+    return null;
+  }
+}
+function saveData(k, v) {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch {}
+}
+const CATS = {
+  "Motor": ["Culata/Cabeza", "Bloque motor", "Pistones", "Vielas", "Arbol de levas", "Balancines y barra", "Buzos", "Varillas de punterias", "Tapa de punterias", "Engranes de distribucion", "Concha de motor", "Rozadores", "Dumper", "Carter", "Bomba de aceite", "Bomba de agua", "Intercooler", "Turbocompresor", "Ventilador de motor", "Fanclutch", "Freno de motor", "Corona del volante/Cremallera", "Marcha/Motor de arranque", "Alternador", "Inyectores", "Computadora/ECM", "Arnes de inyectores", "Arnes de sensores", "Arnes principal", "Sensores de motor"],
+  "Transmision": ["Caja completa", "Palanca de cambios", "Engranes", "Housing", "Concha de transmision/Campana", "Flecha de mando", "Yugo", "Tapa de horquillas", "Cardan"],
+  "Diferencial": ["Masa tambores", "Funda", "Flechas", "Platos", "Porta gavilan", "Gavilan", "Matracas", "Bola de diferencial", "Balatas", "Rotochamber", "Yugo"],
+  "Eje Delantero": ["Mango", "Masa", "Tambores", "Barra estabilizadora", "Rotochamber", "Eje principal", "Plato", "Porta gavilan", "Gavilan", "Balatas"],
+  "Suspension": ["Muelles", "Perchas", "Sobrecargas", "Amortiguadores", "Chumaceras", "Bolsas de aire"],
+  "Frenos": ["Tambor del izq", "Tambor del der", "Tambor tra izq", "Tambor tra der", "Balatas delanteras", "Balatas traseras", "Compresora de aire", "Valvulas de freno", "Camaras de freno", "Tuberia de freno"],
+  "Direccion": ["Caja de direccion", "Columna de direccion", "Bomba de direccion hidraulica", "Mangueras de direccion", "Rotulas de direccion", "Barra de direccion", "Brazo pitman", "Sector de direccion", "Sinfin", "Chaquetero"],
+  "Cabina": ["Cofre/Hood", "Parabrisas", "Puerta izquierda", "Puerta derecha", "Tablero completo", "Asiento conductor", "Asiento copiloto", "Faro izquierdo", "Faro derecho", "Defensa delantera", "Espejo izquierdo", "Espejo derecho", "Techo de cabina", "Guardafango izq", "Guardafango der"],
+  "Chasis": ["Larguero izquierdo", "Larguero derecho", "Travesanos", "Quinta rueda", "Soporte de cabina", "Soporte motor"],
+  "Neumaticos": ["Llanta del izq", "Llanta del der", "Llanta tra 1", "Llanta tra 2", "Llanta tra 3", "Llanta tra 4", "Rin del izq", "Rin del der", "Rines traseros"]
+};
+const PCFG = {
+  "Rin del izq": {
+    marcaOpts: ["Fierro", "Aluminio"],
+    tipoRin: ["Union", "Capuchon", "Artilleria"],
+    modeloLabel: "Medida"
+  },
+  "Rin del der": {
+    marcaOpts: ["Fierro", "Aluminio"],
+    tipoRin: ["Union", "Capuchon", "Artilleria"],
+    modeloLabel: "Medida"
+  },
+  "Rines traseros": {
+    marcaOpts: ["Fierro", "Aluminio"],
+    tipoRin: ["Union", "Capuchon", "Artilleria"],
+    modeloLabel: "Medida"
+  },
+  "Llanta del izq": {
+    isLlanta: true
+  },
+  "Llanta del der": {
+    isLlanta: true
+  },
+  "Llanta tra 1": {
+    isLlanta: true
+  },
+  "Llanta tra 2": {
+    isLlanta: true
+  },
+  "Llanta tra 3": {
+    isLlanta: true
+  },
+  "Llanta tra 4": {
+    isLlanta: true
+  },
+  "Funda": {
+    libraje: true
+  },
+  "Bola de diferencial": {
+    libraje: true
+  },
+  "Yugo": {
+    modeloLabel: "Medida"
+  }
+};
+
+// ─── Mapa del negocio ────────────────────────────────────────────
+// 23 secciones en grid (col, row) segun imagen real del terreno
+// ViewBox: 0 0 330 240 — 7 cols x 6 rows, celda 46x40
+const MAPA_SECS = [{
+  s: 23,
+  c: 0,
+  r: 0
+}, {
+  s: 21,
+  c: 1,
+  r: 0
+}, {
+  s: 19,
+  c: 2,
+  r: 0
+}, {
+  s: 17,
+  c: 3,
+  r: 0
+}, {
+  s: 10,
+  c: 4,
+  r: 0
+}, {
+  s: 9,
+  c: 5,
+  r: 0
+}, {
+  s: 7,
+  c: 6,
+  r: 0
+}, {
+  s: 22,
+  c: 0,
+  r: 1
+}, {
+  s: 20,
+  c: 1,
+  r: 1
+}, {
+  s: 18,
+  c: 2,
+  r: 1
+}, {
+  s: 6,
+  c: 6,
+  r: 1
+}, {
+  s: 15,
+  c: 2,
+  r: 2
+}, {
+  s: 8,
+  c: 4,
+  r: 2
+}, {
+  s: 5,
+  c: 6,
+  r: 2
+}, {
+  s: 14,
+  c: 2,
+  r: 3
+}, {
+  s: 12,
+  c: 3,
+  r: 3
+}, {
+  s: 4,
+  c: 5,
+  r: 3
+}, {
+  s: 3,
+  c: 6,
+  r: 3
+}, {
+  s: 13,
+  c: 2,
+  r: 4
+}, {
+  s: 11,
+  c: 3,
+  r: 4
+}, {
+  s: 2,
+  c: 5,
+  r: 4
+}, {
+  s: 1,
+  c: 6,
+  r: 4
+}];
+const MAPA_CW = 46;
+const MAPA_RH = 40;
+const MAPA_PAD = 3;
+function secPos(c, r) {
+  return {
+    x: MAPA_PAD + c * MAPA_CW + MAPA_CW / 2,
+    y: MAPA_PAD + r * MAPA_RH + MAPA_RH / 2
+  };
+}
+function heatColor(count, max) {
+  if (!count || count === 0) return "#3f3f46";
+  const p = Math.min(count / Math.max(max, 1), 1);
+  if (p < 0.25) return "#1d4ed8";
+  if (p < 0.5) return "#0891b2";
+  if (p < 0.75) return "#d97706";
+  return "#dc2626";
+}
+
+// ─── Unidades Completas ───────────────────────────────────────────
+const UNIDADES_TIPOS = {
+  "Motor completo": ["Bloque motor", "Culata/Cabeza", "Turbocompresor", "Intercooler", "Inyectores", "Bomba de aceite", "Bomba de agua", "Alternador", "Marcha/Motor de arranque", "Carter", "Fanclutch", "Arbol de levas", "Pistones", "Arnes de inyectores", "Sensores de motor"],
+  "Transmision completa": ["Caja completa", "Clutch/Embrague", "Volante motor", "Flecha de mando", "Concha de transmision/Campana", "Housing", "Palanca de cambios"],
+  "Diferencial completo": ["Diferencial trasero", "Flechas", "Platos", "Porta gavilan", "Gavilan", "Funda", "Matracas", "Bola de diferencial", "Rotochamber"],
+  "Cabina completa": ["Cofre/Hood", "Parabrisas", "Puerta izquierda", "Puerta derecha", "Tablero completo", "Asiento conductor", "Asiento copiloto", "Faro izquierdo", "Faro derecho", "Defensa delantera", "Espejo izquierdo", "Espejo derecho"],
+  "Chasis completo": ["Larguero izquierdo", "Larguero derecho", "Travesanos", "Quinta rueda", "Soporte de cabina"]
+};
+const CANALES = ["Mostrador", "Telefono", "WhatsApp", "Facebook", "Mercado Libre"];
+const TIPO_CLIENTE = {
+  nuevo: "Nuevo",
+  frecuente: "Frecuente",
+  mayorista: "Mayorista"
+};
+const TIPO_COLOR = {
+  nuevo: "blue",
+  frecuente: "green",
+  mayorista: "amber"
+};
+const ROT_LABEL = {
+  rapida: "Rapida",
+  media: "Media",
+  lenta: "Lenta"
+};
+const TIPO_VENTA = {
+  por_piezas: "Por piezas",
+  completo: "Completo",
+  mixto: "Mixto"
+};
+const SEED_SELLERS = [{
+  id: "S001",
+  nombre: "Admin",
+  rol: "admin",
+  pin: "1994",
+  maxDescuento: 100,
+  activo: true
+}];
+const SEED_CLIENTS = [{
+  id: "C001",
+  nombre: "Transportes Ramirez",
+  telefono: "8112345678",
+  tipo: "frecuente",
+  notas: "",
+  fechaRegistro: "2025-01-15"
+}, {
+  id: "C002",
+  nombre: "Taller Mendoza",
+  telefono: "8198765432",
+  tipo: "mayorista",
+  notas: "",
+  fechaRegistro: "2025-02-01"
+}];
+const SEED_TRUCKS = [{
+  id: "T001",
+  nombre: "Kenworth T800 2018",
+  marca: "Kenworth",
+  modelo: "T800",
+  anio: 2018,
+  costoCompra: 85000,
+  precioVenta: null,
+  fechaEntrada: "2025-01-10",
+  notas: "",
+  tipoVenta: "por_piezas"
+}, {
+  id: "T002",
+  nombre: "International 4300 2016",
+  marca: "International",
+  modelo: "4300",
+  anio: 2016,
+  costoCompra: 52000,
+  precioVenta: null,
+  fechaEntrada: "2025-02-20",
+  notas: "",
+  tipoVenta: "por_piezas"
+}];
+const SEED_PARTS = [{
+  id: "P001",
+  camionId: "T001",
+  sistema: "Motor",
+  nombre: "Culata/Cabeza",
+  marca: "Cummins",
+  modelo: "ISX15",
+  condicion: "A",
+  precioBase: 35000,
+  precioMinimo: 28000,
+  rotacion: "rapida",
+  estado: "disponible",
+  fechaIngreso: "2025-01-12",
+  disponibilidad: "por_pieza",
+  esSuelta: false
+}, {
+  id: "P002",
+  camionId: "T001",
+  sistema: "Transmision",
+  nombre: "Caja completa",
+  marca: "Eaton",
+  modelo: "Fuller 18vel",
+  condicion: "B",
+  precioBase: 18000,
+  precioMinimo: 14000,
+  rotacion: "media",
+  estado: "disponible",
+  fechaIngreso: "2025-01-12",
+  disponibilidad: "por_pieza",
+  esSuelta: false
+}, {
+  id: "P003",
+  camionId: "T001",
+  sistema: "Cabina",
+  nombre: "Cofre/Hood",
+  marca: "Kenworth",
+  modelo: "T800",
+  condicion: "N",
+  precioBase: 15000,
+  precioMinimo: 12000,
+  rotacion: "lenta",
+  estado: "disponible",
+  fechaIngreso: "2025-01-13",
+  disponibilidad: "por_pieza",
+  esSuelta: false
+}, {
+  id: "P004",
+  camionId: "T002",
+  sistema: "Motor",
+  nombre: "Bloque motor",
+  marca: "Maxxforce",
+  modelo: "DT",
+  condicion: "C",
+  precioBase: 14000,
+  precioMinimo: 9000,
+  rotacion: "media",
+  estado: "disponible",
+  fechaIngreso: "2025-02-22",
+  disponibilidad: "por_pieza",
+  esSuelta: false
+}];
+const SEED_SALES = [{
+  id: "V001",
+  piezaId: "P002",
+  camionId: "T001",
+  clienteId: "C001",
+  nombrePieza: "Caja completa",
+  precioBase: 18000,
+  precioFinal: 17000,
+  descuento: 1000,
+  motivoDescuento: "Cliente frecuente",
+  vendedorId: "S002",
+  vendedor: "Carlos",
+  canal: "Mostrador",
+  fecha: "2025-03-05"
+}];
+function adj(b, c) {
+  if (c === "N") return Math.round(b * 1.3);
+  if (c === "A") return Math.round(b * 1.15);
+  if (c === "C") return Math.round(b * 0.7);
+  return b;
+}
+function uid(p) {
+  return p + Date.now().toString(36).toUpperCase().slice(-5);
+}
+function fmt(n) {
+  return "$" + Number(n).toLocaleString("es-MX");
+}
+function condColor(c) {
+  return c === "N" ? "green" : c === "A" ? "blue" : c === "C" ? "red" : "gray";
+}
+function condLabel(c) {
+  return c === "N" ? "N-Nueva" : c === "A" ? "A-Excelente" : c === "C" ? "C-Reparar" : "B-Funcional";
+}
+function exportarExcel(trucks, parts, sales, clients) {
+  const wb = XLSX.utils.book_new();
+  const camData = trucks.map(t => ({
+    ID: t.id,
+    Nombre: t.nombre,
+    Marca: t.marca,
+    Modelo: t.modelo,
+    Anio: t.anio || t.anno || "",
+    "Costo Compra": t.costoCompra,
+    "Precio Venta": t.precioVenta || "",
+    "Tipo Venta": TIPO_VENTA[t.tipoVenta] || t.tipoVenta,
+    "Fecha Entrada": t.fechaEntrada,
+    Notas: t.notas || ""
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(camData.length ? camData : [{
+    info: "Sin camiones"
+  }]), "Camiones");
+  const pData = parts.map(p => {
+    const t = trucks.find(x => x.id === p.camionId);
+    return {
+      ID: p.id,
+      Camion: t ? t.nombre : "Pieza suelta",
+      Sistema: p.sistema,
+      Nombre: p.nombre,
+      Marca: p.marca || "",
+      Modelo: p.modelo || "",
+      Libraje: p.libraje || "",
+      "Tipo Rin": p.tipoRin || "",
+      Condicion: condLabel(p.condicion),
+      "Precio Base": p.precioBase,
+      "Precio Minimo": p.precioMinimo,
+      "Precio Ajustado": adj(p.precioBase, p.condicion),
+      Rotacion: p.rotacion,
+      Estado: p.estado,
+      "Fecha Ingreso": p.fechaIngreso
+    };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pData.length ? pData : [{
+    info: "Sin piezas"
+  }]), "Piezas");
+  const sData = sales.map(v => {
+    const t = trucks.find(x => x.id === v.camionId);
+    const c = clients.find(x => x.id === v.clienteId);
+    return {
+      ID: v.id,
+      Pieza: v.nombrePieza,
+      Camion: t ? t.nombre : "Pieza suelta",
+      Cliente: c ? c.nombre : "Sin cliente",
+      "Precio Final": v.precioFinal,
+      Descuento: v.descuento,
+      Vendedor: v.vendedor,
+      Canal: v.canal,
+      Fecha: v.fecha
+    };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sData.length ? sData : [{
+    info: "Sin ventas"
+  }]), "Ventas");
+  const cData = clients.map(c => ({
+    ID: c.id,
+    Nombre: c.nombre,
+    Telefono: c.telefono,
+    Tipo: TIPO_CLIENTE[c.tipo] || c.tipo,
+    Notas: c.notas || "",
+    "Fecha Registro": c.fechaRegistro
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cData.length ? cData : [{
+    info: "Sin clientes"
+  }]), "Clientes");
+  XLSX.writeFile(wb, "deshuesadero_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+}
+function respaldarJSON(data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "backup_deshuesadero_" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function Badge({
+  children,
+  color = "gray"
+}) {
+  const c = {
+    amber: "bg-amber-900/40 text-amber-300 border-amber-700/50",
+    green: "bg-emerald-900/40 text-emerald-300 border-emerald-700/50",
+    red: "bg-red-900/40 text-red-300 border-red-700/50",
+    blue: "bg-sky-900/40 text-sky-300 border-sky-700/50",
+    gray: "bg-zinc-800 text-zinc-400 border-zinc-700",
+    purple: "bg-purple-900/40 text-purple-300 border-purple-700/50",
+    orange: "bg-orange-900/40 text-orange-300 border-orange-700/50"
+  };
+  return React.createElement("span", {
+    className: "text-xs font-bold px-2 py-0.5 rounded-full border " + (c[color] || c.gray)
+  }, children);
+}
+function KPI({
+  label,
+  value,
+  sub,
+  accent,
+  warn
+}) {
+  return React.createElement("div", {
+    className: "rounded-xl p-4 border " + (accent ? "bg-amber-500/10 border-amber-500/40" : warn ? "bg-red-900/20 border-red-800/40" : "bg-zinc-900 border-zinc-800")
+  }, React.createElement("p", {
+    className: "text-xs text-zinc-500 uppercase tracking-widest mb-1"
+  }, label), React.createElement("p", {
+    className: "text-2xl font-black " + (accent ? "text-amber-400" : warn ? "text-red-400" : "text-zinc-100")
+  }, value), sub && React.createElement("p", {
+    className: "text-xs text-zinc-500 mt-1"
+  }, sub));
+}
+function Inp({
+  label,
+  ...props
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, label && /*#__PURE__*/React.createElement("label", {
+    className: "text-xs text-zinc-400 uppercase tracking-wider"
+  }, label), /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition",
+    ...props
+  }));
+}
+function Sel({
+  label,
+  children,
+  ...props
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, label && /*#__PURE__*/React.createElement("label", {
+    className: "text-xs text-zinc-400 uppercase tracking-wider"
+  }, label), /*#__PURE__*/React.createElement("select", {
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition",
+    ...props
+  }, children));
+}
+function Txta({
+  label,
+  ...props
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, label && /*#__PURE__*/React.createElement("label", {
+    className: "text-xs text-zinc-400 uppercase tracking-wider"
+  }, label), /*#__PURE__*/React.createElement("textarea", {
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition resize-none h-20",
+    ...props
+  }));
+}
+function Btn({
+  children,
+  onClick,
+  variant = "primary",
+  size = "md",
+  disabled = false,
+  full = false
+}) {
+  const s = {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+    lg: "px-6 py-3 text-base"
+  };
+  const v = {
+    primary: "bg-amber-500 hover:bg-amber-400 text-black",
+    ghost: "border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400",
+    danger: "border border-red-800 text-red-400 hover:bg-red-900/30",
+    success: "bg-emerald-600 hover:bg-emerald-500 text-white"
+  };
+  return /*#__PURE__*/React.createElement("button", {
+    className: "font-bold rounded-lg transition focus:outline-none disabled:opacity-40 cursor-pointer " + s[size] + " " + (v[variant] || v.primary) + (full ? " w-full" : ""),
+    onClick: onClick,
+    disabled: disabled
+  }, children);
+}
+function Modal({
+  title,
+  onClose,
+  children
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-screen overflow-y-auto"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-950"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-black text-zinc-100"
+  }, title), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "text-zinc-500 hover:text-zinc-200 text-2xl"
+  }, "x")), /*#__PURE__*/React.createElement("div", {
+    className: "p-5"
+  }, children)));
+}
+const CondSel = ({
+  value,
+  onChange
+}) => /*#__PURE__*/React.createElement(Sel, {
+  label: "Condicion",
+  value: value,
+  onChange: onChange
+}, /*#__PURE__*/React.createElement("option", {
+  value: "N"
+}, "N - Nueva (+30%)"), /*#__PURE__*/React.createElement("option", {
+  value: "A"
+}, "A - Excelente (+15%)"), /*#__PURE__*/React.createElement("option", {
+  value: "B"
+}, "B - Funcional (base)"), /*#__PURE__*/React.createElement("option", {
+  value: "C"
+}, "C - Reparar (-30%)"));
+function FormPieza({
+  form,
+  setForm,
+  truck,
+  onSave,
+  onCancel,
+  onDelete,
+  isEdit
+}) {
+  const cfg = PCFG[form.nombre] || {};
+  const defDisp = !truck || truck.tipoVenta === "completo" ? "con_camion_completo" : "por_pieza";
+  const ajustado = form.precioBase ? adj(Number(form.precioBase), form.condicion) : 0;
+  const llanMedida = cfg.isLlanta && form.llanAncho ? form.llanAncho + "/" + form.llanPerfil + "R" + form.llanDiametro : null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-xl p-4 space-y-3 border border-amber-500/30"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-amber-400 uppercase"
+  }, "Datos de la pieza"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    className: "text-zinc-500 hover:text-zinc-200 text-lg"
+  }, "x")), /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre *",
+    value: form.nombre,
+    onChange: e => setForm(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, cfg.marcaOpts ? /*#__PURE__*/React.createElement(Sel, {
+    label: "Material",
+    value: form.marca || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar..."), cfg.marcaOpts.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o
+  }, o))) : /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: form.marca || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      marca: e.target.value
+    })),
+    placeholder: "Ej: Cummins"
+  }), cfg.isLlanta ? /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-xs text-zinc-400 uppercase"
+  }, "Medida (ancho/perfil R diam)"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1 items-center"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-zinc-100 text-sm w-16",
+    placeholder: "295",
+    value: form.llanAncho || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      llanAncho: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "/"), /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-zinc-100 text-sm w-12",
+    placeholder: "75",
+    value: form.llanPerfil || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      llanPerfil: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "R"), /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-zinc-100 text-sm w-16",
+    placeholder: "22.5",
+    value: form.llanDiametro || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      llanDiametro: e.target.value
+    }))
+  })), llanMedida && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-amber-400 font-bold"
+  }, llanMedida)) : /*#__PURE__*/React.createElement(Inp, {
+    label: cfg.modeloLabel || "Modelo",
+    value: form.modelo || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      modelo: e.target.value
+    }))
+  })), cfg.tipoRin && /*#__PURE__*/React.createElement(Sel, {
+    label: "Tipo de rin",
+    value: form.tipoRin || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      tipoRin: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar..."), cfg.tipoRin.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o
+  }, o))), cfg.libraje && /*#__PURE__*/React.createElement(Inp, {
+    label: "Libraje",
+    value: form.libraje || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      libraje: e.target.value
+    })),
+    placeholder: "Ej: 3500 lb"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(CondSel, {
+    value: form.condicion,
+    onChange: e => setForm(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: form.precioBase || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Minimo $",
+    type: "number",
+    value: form.precioMinimo || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      precioMinimo: e.target.value
+    })),
+    placeholder: form.precioBase ? String(Math.round(Number(form.precioBase) * 0.7)) : "auto 70%"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Rotacion",
+    value: form.rotacion,
+    onChange: e => setForm(f => ({
+      ...f,
+      rotacion: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "rapida"
+  }, "Rapida"), /*#__PURE__*/React.createElement("option", {
+    value: "media"
+  }, "Media"), /*#__PURE__*/React.createElement("option", {
+    value: "lenta"
+  }, "Lenta")), /*#__PURE__*/React.createElement(Sel, {
+    label: "Disponibilidad",
+    value: form.disponibilidad || defDisp,
+    onChange: e => setForm(f => ({
+      ...f,
+      disponibilidad: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "por_pieza"
+  }, "Por pieza"), /*#__PURE__*/React.createElement("option", {
+    value: "con_camion_completo"
+  }, "Solo con camion completo"))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Cantidad",
+    type: "number",
+    value: form.cantidad || 1,
+    min: "1",
+    onChange: e => setForm(f => ({
+      ...f,
+      cantidad: Math.max(1, Number(e.target.value))
+    }))
+  }), form.precioBase && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Precio ajustado: ", /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold"
+  }, fmt(ajustado)), form.condicion === "N" && /*#__PURE__*/React.createElement("span", {
+    className: "text-emerald-400 ml-2"
+  }, "(pieza nueva +30%)")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      _showMapa: true
+    })),
+    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg transition font-bold"
+  }, form.ubicacion ? "📍 Seccion " + form.ubicacion.seccion : "📍 Asignar ubicacion"), form.ubicacion && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      ubicacion: null
+    })),
+    className: "text-xs text-red-400 hover:text-red-300"
+  }, "Quitar")), form._showMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+    value: form.ubicacion,
+    onChange: v => setForm(f => ({
+      ...f,
+      ubicacion: v,
+      _showMapa: false
+    })),
+    onClose: () => setForm(f => ({
+      ...f,
+      _showMapa: false
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-1"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: onSave,
+    disabled: !form.nombre || !form.precioBase
+  }, isEdit ? "Actualizar" : "Agregar"), isEdit && onDelete && /*#__PURE__*/React.createElement(Btn, {
+    variant: "danger",
+    size: "sm",
+    onClick: onDelete
+  }, "Quitar"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    size: "sm",
+    onClick: onCancel
+  }, "Cancelar")));
+}
+function RegistroPiezas({
+  truck,
+  existingParts,
+  onSave,
+  onClose,
+  user
+}) {
+  const catKeys = Object.keys(CATS);
+  const [activeCat, setActiveCat] = useState(catKeys[0]);
+  const [piezas, setPiezas] = useState(() => existingParts ? existingParts.filter(p => p.estado !== "vendida").map(p => ({
+    ...p
+  })) : []);
+  const [activeForm, setActiveForm] = useState(null);
+  const [catModos, setCatModos] = useState({}); // {cat: "piezas"|"completo"}
+  function getCatModo(cat) {
+    return catModos[cat] || "piezas";
+  }
+  function toggleCatModo(cat) {
+    setCatModos(m => ({
+      ...m,
+      [cat]: m[cat] === "completo" ? "piezas" : "completo"
+    }));
+    setActiveForm(null);
+  }
+  const defDisp = truck ? truck.tipoVenta === "completo" ? "con_camion_completo" : "por_pieza" : "por_pieza";
+  const blankF = {
+    nombre: "",
+    marca: "",
+    modelo: "",
+    condicion: "B",
+    precioBase: "",
+    precioMinimo: "",
+    rotacion: "media",
+    disponibilidad: defDisp,
+    libraje: "",
+    tipoRin: "",
+    llanAncho: "",
+    llanPerfil: "",
+    llanDiametro: "",
+    cantidad: 1
+  };
+  const [form, setForm] = useState(blankF);
+  function isAdded(cat, nombre) {
+    return piezas.some(p => p.sistema === cat && p.nombre === nombre);
+  }
+  function getPieza(cat, nombre) {
+    return piezas.find(p => p.sistema === cat && p.nombre === nombre);
+  }
+  function handleChip(cat, nombre) {
+    const ex = getPieza(cat, nombre);
+    if (ex) {
+      setForm({
+        ...ex,
+        precioBase: String(ex.precioBase),
+        precioMinimo: String(ex.precioMinimo)
+      });
+    } else {
+      setForm({
+        ...blankF,
+        nombre,
+        sistema: cat
+      });
+    }
+    setActiveForm(nombre);
+  }
+  function handleCustom() {
+    setForm({
+      ...blankF,
+      nombre: "",
+      sistema: activeCat
+    });
+    setActiveForm("__custom__");
+  }
+  function savePart() {
+    if (!form.nombre || !form.precioBase) return;
+    const base = Number(form.precioBase);
+    const cfg = PCFG[form.nombre] || {};
+    const medida = cfg.isLlanta && form.llanAncho ? form.llanAncho + "/" + form.llanPerfil + "R" + form.llanDiametro : form.modelo;
+    const part = {
+      ...form,
+      id: getPieza(activeCat, form.nombre)?.id || uid("P"),
+      camionId: truck ? truck.id : null,
+      sistema: activeCat,
+      estado: "disponible",
+      fechaIngreso: new Date().toISOString().slice(0, 10),
+      precioBase: base,
+      precioMinimo: Number(form.precioMinimo) || Math.round(base * 0.7),
+      modelo: medida,
+      esSuelta: !truck,
+      cantidad: Number(form.cantidad) || 1,
+      creadoPor: user?.nombre || "Admin"
+    };
+    setPiezas(p => [...p.filter(x => !(x.sistema === activeCat && x.nombre === form.nombre)), part]);
+    setActiveForm(null);
+    setForm(blankF);
+  }
+  function removePart(cat, nombre) {
+    setPiezas(p => p.filter(x => !(x.sistema === cat && x.nombre === nombre)));
+    setActiveForm(null);
+  }
+  function finish() {
+    onSave(piezas);
+    onClose();
+  }
+  const catPiezas = piezas.filter(p => p.sistema === activeCat);
+  const total = piezas.length;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-zinc-950 flex flex-col overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "border-b border-zinc-800 px-4 py-3 flex items-center justify-between shrink-0"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "font-black text-zinc-100 text-sm"
+  }, truck ? truck.nombre : "Agregar piezas"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold"
+  }, total), " piezas registradas")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    size: "sm",
+    onClick: onClose
+  }, "Cancelar"), /*#__PURE__*/React.createElement(Btn, {
+    size: "sm",
+    variant: "success",
+    onClick: finish
+  }, "Guardar ", total, " piezas"))), /*#__PURE__*/React.createElement("div", {
+    className: "border-b border-zinc-800 px-4 py-2 overflow-x-auto shrink-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5"
+  }, catKeys.map(cat => {
+    const cnt = piezas.filter(p => p.sistema === cat).length;
+    const isCompleto = getCatModo(cat) === "completo";
+    return /*#__PURE__*/React.createElement("button", {
+      key: cat,
+      onClick: () => {
+        setActiveCat(cat);
+        setActiveForm(null);
+      },
+      className: "px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition flex items-center gap-1.5 " + (activeCat === cat ? "bg-amber-500 text-black" : isCompleto ? "bg-purple-900/50 border border-purple-700 text-purple-300" : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200")
+    }, cat, isCompleto && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs"
+    }, "★"), cnt > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "rounded-full px-1.5 text-xs " + (activeCat === cat ? "bg-black/30" : "bg-emerald-500 text-black")
+    }, cnt));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto px-4 py-4 max-w-3xl mx-auto w-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-zinc-400 uppercase"
+  }, activeCat), /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleCatModo(activeCat),
+    className: "text-xs font-bold px-3 py-1 rounded-lg border transition " + (getCatModo(activeCat) === "completo" ? "bg-purple-900/50 border-purple-600 text-purple-300" : "border-zinc-700 text-zinc-400 hover:border-amber-500 hover:text-amber-400")
+  }, getCatModo(activeCat) === "completo" ? "★ Sistema completo" : "☆ Marcar como completo")), getCatModo(activeCat) === "completo" && (() => {
+    const items = CATS[activeCat];
+    const checklist = piezas.find(p => p.sistema === activeCat && p.esChecklist);
+    const checked = checklist?.checklist || {};
+    return /*#__PURE__*/React.createElement("div", {
+      className: "space-y-3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "grid grid-cols-2 gap-1.5"
+    }, items.map(item => /*#__PURE__*/React.createElement("button", {
+      key: item,
+      onClick: () => {
+        const newChecked = {
+          ...checked,
+          [item]: !checked[item]
+        };
+        const existing = piezas.find(p => p.sistema === activeCat && p.esChecklist);
+        if (existing) {
+          setPiezas(p => p.map(x => x.sistema === activeCat && x.esChecklist ? {
+            ...x,
+            checklist: newChecked
+          } : x));
+        } else {
+          setPiezas(p => [...p, {
+            id: uid("CL"),
+            camionId: truck?.id,
+            sistema: activeCat,
+            nombre: activeCat + " completo",
+            esChecklist: true,
+            checklist: newChecked,
+            condicion: "B",
+            precioBase: 0,
+            precioMinimo: 0,
+            rotacion: "media",
+            estado: "disponible",
+            fechaIngreso: new Date().toISOString().slice(0, 10),
+            disponibilidad: "por_pieza",
+            esSuelta: false,
+            cantidad: 1
+          }]);
+        }
+      },
+      className: "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition " + (checked[item] ? "bg-emerald-900/40 border border-emerald-700 text-emerald-300" : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-amber-500")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "shrink-0"
+    }, checked[item] ? "✓" : "○"), /*#__PURE__*/React.createElement("span", null, item)))), /*#__PURE__*/React.createElement(Inp, {
+      label: "Precio de " + activeCat + " completo $",
+      type: "number",
+      value: String(checklist?.precioBase || ""),
+      onChange: e => setPiezas(p => p.map(x => x.sistema === activeCat && x.esChecklist ? {
+        ...x,
+        precioBase: Number(e.target.value),
+        precioMinimo: Math.round(Number(e.target.value) * 0.7)
+      } : x)),
+      placeholder: "Precio del sistema completo"
+    }), !checklist && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-600 text-center"
+    }, "Toca las piezas que incluye el sistema"));
+  })(), getCatModo(activeCat) === "piezas" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2 mb-4"
+  }, CATS[activeCat].map(nombre => {
+    const added = isAdded(activeCat, nombre);
+    return /*#__PURE__*/React.createElement("button", {
+      key: nombre,
+      onClick: () => handleChip(activeCat, nombre),
+      className: "px-3 py-1.5 text-xs font-semibold rounded-lg border transition " + (added ? "bg-emerald-900/40 border-emerald-700 text-emerald-300" : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-amber-500")
+    }, added ? "✓ " : "+ ", nombre);
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: handleCustom,
+    className: "px-3 py-1.5 text-xs font-semibold rounded-lg border border-dashed border-zinc-600 text-zinc-500 hover:border-amber-500 hover:text-amber-400 transition"
+  }, "+ Personalizada")), activeForm && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement(FormPieza, {
+    form: form,
+    setForm: setForm,
+    truck: truck,
+    onSave: savePart,
+    onCancel: () => setActiveForm(null),
+    onDelete: activeForm !== "__custom__" && isAdded(activeCat, form.nombre) ? () => removePart(activeCat, form.nombre) : null,
+    isEdit: activeForm !== "__custom__" && isAdded(activeCat, form.nombre)
+  })), catPiezas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1 mt-2"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-600 font-bold uppercase mb-2"
+  }, "Registradas en ", activeCat), catPiezas.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.nombre,
+    className: "flex justify-between items-center bg-zinc-950 rounded-lg px-3 py-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap min-w-0"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-zinc-200 font-semibold truncate"
+  }, p.nombre), p.marca && /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-zinc-500"
+  }, p.marca, p.modelo ? " · " + p.modelo : ""), /*#__PURE__*/React.createElement(Badge, {
+    color: condColor(p.condicion)
+  }, condLabel(p.condicion))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 shrink-0 ml-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold text-sm"
+  }, fmt(adj(p.precioBase, p.condicion))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleChip(activeCat, p.nombre),
+    className: "text-xs text-zinc-500 hover:text-amber-400"
+  }, "editar"))))), catPiezas.filter(p => !p.esChecklist).length === 0 && !activeForm && /*#__PURE__*/React.createElement("p", {
+    className: "text-center text-zinc-700 text-sm py-4"
+  }, "Selecciona piezas de arriba para agregarlas"))), total > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-amber-400 mb-2"
+  }, "Total: ", total, " piezas"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-1.5 mb-3"
+  }, catKeys.map(cat => {
+    const cnt = piezas.filter(p => p.sistema === cat).length;
+    if (!cnt) return null;
+    return /*#__PURE__*/React.createElement("span", {
+      key: cat,
+      className: "text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full"
+    }, cat, ": ", cnt);
+  })), /*#__PURE__*/React.createElement(Btn, {
+    full: true,
+    variant: "success",
+    onClick: finish
+  }, "Guardar ", total, " piezas"))));
+}
+function FichaCamion({
+  truck,
+  parts,
+  onBack,
+  onEditPiezas
+}) {
+  const [openCat, setOpenCat] = useState(null);
+  const tParts = parts.filter(p => p.camionId === truck.id);
+  const disp = tParts.filter(p => p.estado === "disponible");
+  const vendidas = tParts.filter(p => p.estado === "vendida");
+  const totalValor = disp.reduce((a, p) => a + adj(p.precioBase, p.condicion), 0);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onBack,
+    className: "text-zinc-400 hover:text-amber-400 text-sm font-bold"
+  }, "← Camiones"), /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-900 border border-zinc-800 rounded-xl p-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-start flex-wrap gap-3 mb-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, truck.nombre), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, truck.marca, " ", truck.modelo, " · ", truck.anio || truck.anno || ""), truck.notas && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-400 italic mt-1"
+  }, "\"", truck.notas, "\"")), /*#__PURE__*/React.createElement("div", {
+    className: "text-right"
+  }, /*#__PURE__*/React.createElement(Badge, {
+    color: truck.tipoVenta === "completo" ? "purple" : truck.tipoVenta === "mixto" ? "amber" : "green"
+  }, TIPO_VENTA[truck.tipoVenta] || truck.tipoVenta)), truck.ubicacion && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-amber-400/80 mb-2"
+  }, "📍 Seccion ", truck.ubicacion.seccion), truck.tipoVenta !== "por_piezas" && truck.precioVenta && /*#__PURE__*/React.createElement("p", {
+    className: "text-lg font-black text-amber-400"
+  }, fmt(truck.precioVenta))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3 text-center mb-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-lg p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-lg font-black text-zinc-100"
+  }, disp.length), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Disponibles")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-lg p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-lg font-black text-amber-400"
+  }, fmt(totalValor)), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Valor inventario")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-lg p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-lg font-black text-emerald-400"
+  }, vendidas.length), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Vendidas"))), /*#__PURE__*/React.createElement(Btn, {
+    onClick: onEditPiezas,
+    variant: "ghost"
+  }, "Editar piezas")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, Object.keys(CATS).map(cat => {
+    const catDisp = disp.filter(p => p.sistema === cat);
+    const catVend = vendidas.filter(p => p.sistema === cat);
+    const hasAny = catDisp.length > 0 || catVend.length > 0;
+    const isOpen = openCat === cat;
+    return /*#__PURE__*/React.createElement("div", {
+      key: cat,
+      className: "border rounded-xl overflow-hidden " + (hasAny ? "border-zinc-700 bg-zinc-900" : "border-zinc-800/40 bg-zinc-900/40")
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "w-full px-4 py-3 flex items-center justify-between",
+      onClick: () => setOpenCat(isOpen ? null : cat)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-3"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-bold text-sm " + (hasAny ? "text-zinc-100" : "text-zinc-600")
+    }, cat), catDisp.length > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs bg-emerald-900/50 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full"
+    }, catDisp.length), catVend.length > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full"
+    }, catVend.length, " vendidas")), /*#__PURE__*/React.createElement("span", {
+      className: "text-zinc-500 text-xs"
+    }, isOpen ? "▲" : "▼")), isOpen && /*#__PURE__*/React.createElement("div", {
+      className: "px-4 pb-4 border-t border-zinc-800 pt-3 flex flex-wrap gap-2"
+    }, CATS[cat].map(nombre => {
+      const part = catDisp.find(p => p.nombre === nombre);
+      const sold = catVend.find(p => p.nombre === nombre);
+      if (part) return /*#__PURE__*/React.createElement("div", {
+        key: nombre,
+        className: "bg-emerald-900/30 border border-emerald-800/50 rounded-lg px-3 py-2 text-xs"
+      }, /*#__PURE__*/React.createElement("p", {
+        className: "text-emerald-300 font-bold"
+      }, "✓ ", nombre), part.marca && /*#__PURE__*/React.createElement("p", {
+        className: "text-emerald-400/70"
+      }, part.marca, part.modelo ? " · " + part.modelo : ""), part.libraje && /*#__PURE__*/React.createElement("p", {
+        className: "text-emerald-400/70"
+      }, "Libraje: ", part.libraje), part.ubicacion && /*#__PURE__*/React.createElement("p", {
+        className: "text-amber-400/70 mt-0.5"
+      }, "📍 Sec.", part.ubicacion.seccion), /*#__PURE__*/React.createElement("p", {
+        className: "text-amber-400 font-bold mt-1"
+      }, fmt(adj(part.precioBase, part.condicion))));
+      if (sold) return /*#__PURE__*/React.createElement("div", {
+        key: nombre,
+        className: "bg-zinc-800/40 border border-zinc-700/30 rounded-lg px-3 py-2 text-xs opacity-60"
+      }, /*#__PURE__*/React.createElement("p", {
+        className: "text-zinc-500 line-through"
+      }, nombre), /*#__PURE__*/React.createElement("p", {
+        className: "text-zinc-600"
+      }, "Vendida"));
+      return /*#__PURE__*/React.createElement("div", {
+        key: nombre,
+        className: "bg-zinc-800/20 border border-zinc-800 rounded-lg px-3 py-2 text-xs"
+      }, /*#__PURE__*/React.createElement("p", {
+        className: "text-zinc-600"
+      }, "— ", nombre));
+    }), catDisp.filter(p => !CATS[cat].includes(p.nombre)).map(p => /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: "bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2 text-xs"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-amber-300 font-bold"
+    }, "+ ", p.nombre), /*#__PURE__*/React.createElement("p", {
+      className: "text-amber-400 font-bold"
+    }, fmt(adj(p.precioBase, p.condicion)))))));
+  })));
+}
+
+// ─── MAPA SELECTOR ────────────────────────────────────────────────
+function MapaSVG({
+  value,
+  onPick,
+  readonly
+}) {
+  const CW = 48;
+  const RH = 42;
+  const PAD = 6;
+  const vw = PAD * 2 + 7 * CW + 20;
+  const vh = PAD * 2 + 5 * RH + 30;
+  const W = CW - 4;
+  const H = RH - 4;
+  function cx(c) {
+    return PAD + 20 + c * CW + CW / 2;
+  }
+  function cy(r) {
+    return PAD + r * RH + RH / 2;
+  }
+
+  // Empty interior cells (inside property but no section)
+  const inside = [[3, 1], [4, 1], [5, 1], [0, 2], [1, 2], [3, 2], [5, 2], [0, 3], [1, 3], [0, 4], [1, 4]];
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 " + vw + " " + vh,
+    width: "100%",
+    style: {
+      display: "block",
+      background: "#111111",
+      borderRadius: "10px"
+    }
+  }, inside.map(([c, r]) => /*#__PURE__*/React.createElement("rect", {
+    key: c + "-" + r,
+    x: PAD + 20 + c * CW + 2,
+    y: PAD + r * RH + 2,
+    width: W,
+    height: H,
+    rx: 5,
+    fill: "#1c1c1e",
+    stroke: "#2d2d2d",
+    strokeWidth: 1
+  })), /*#__PURE__*/React.createElement("rect", {
+    x: PAD + 20 + 4 * CW + 2,
+    y: PAD + 3 * RH + 2,
+    width: W,
+    height: H * 2 + RH - H,
+    rx: 5,
+    fill: "#312e81",
+    stroke: "#4338ca",
+    strokeWidth: 1.5
+  }), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 20 + 4 * CW + CW / 2,
+    y: PAD + 3 * RH + RH * 0.38,
+    textAnchor: "middle",
+    dominantBaseline: "central",
+    fontSize: "8",
+    fontWeight: "bold",
+    fill: "#a5b4fc"
+  }, "OFICINA"), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 20 + 4 * CW + CW / 2,
+    y: PAD + 3 * RH + RH * 0.72,
+    textAnchor: "middle",
+    dominantBaseline: "central",
+    fontSize: "8",
+    fontWeight: "bold",
+    fill: "#a5b4fc"
+  }, "/"), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 20 + 4 * CW + CW / 2,
+    y: PAD + 4 * RH + RH * 0.38,
+    textAnchor: "middle",
+    dominantBaseline: "central",
+    fontSize: "8",
+    fontWeight: "bold",
+    fill: "#a5b4fc"
+  }, "TALLER"), MAPA_SECS.map(({
+    s,
+    c,
+    r
+  }) => {
+    const x = cx(c);
+    const y = cy(r);
+    const sel = value?.seccion === s;
+    const isLeft = c <= 1 && r >= 1;
+    const bg = sel ? "#f59e0b" : isLeft ? "#44403c" : "#3f3f46";
+    const stroke = sel ? "#fbbf24" : isLeft ? "#78716c" : "#52525b";
+    return /*#__PURE__*/React.createElement("g", {
+      key: s,
+      onClick: readonly ? undefined : () => onPick && onPick(s),
+      style: {
+        cursor: readonly ? "default" : "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: PAD + 20 + c * CW + 2,
+      y: PAD + r * RH + 2,
+      width: W,
+      height: H,
+      rx: 5,
+      fill: bg,
+      stroke: stroke,
+      strokeWidth: sel ? 2.5 : 1
+    }), /*#__PURE__*/React.createElement("text", {
+      x: x,
+      y: y,
+      textAnchor: "middle",
+      dominantBaseline: "central",
+      fontSize: "13",
+      fontWeight: "bold",
+      fill: sel ? "#000" : "#e4e4e7"
+    }, s));
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: PAD + 20,
+    y: PAD,
+    width: 7 * CW,
+    height: 5 * RH,
+    rx: 6,
+    fill: "none",
+    stroke: "#f59e0b",
+    strokeWidth: 1.5,
+    strokeDasharray: "4 3",
+    opacity: "0.4"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: PAD + 20 + 5 * CW,
+    y: PAD + 5 * RH + 4,
+    width: 2 * CW - 4,
+    height: 18,
+    rx: 4,
+    fill: "#f59e0b",
+    opacity: "0.15",
+    stroke: "#f59e0b",
+    strokeWidth: 1,
+    strokeDasharray: "3 2"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 20 + 6 * CW,
+    y: PAD + 5 * RH + 14,
+    textAnchor: "middle",
+    fontSize: "9",
+    fill: "#f59e0b",
+    fontWeight: "bold"
+  }, "↑ ENTRADA"), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 20 + 7 * CW + 6,
+    y: PAD + 2 * RH,
+    fontSize: "8",
+    fill: "#52525b",
+    fontWeight: "bold"
+  }, "E"), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 18,
+    y: PAD + 2 * RH,
+    textAnchor: "end",
+    fontSize: "8",
+    fill: "#52525b",
+    fontWeight: "bold"
+  }, "O"), /*#__PURE__*/React.createElement("text", {
+    x: PAD + 20 + 3.5 * CW,
+    y: PAD - 1,
+    textAnchor: "middle",
+    fontSize: "8",
+    fill: "#52525b",
+    fontWeight: "bold"
+  }, "N"));
+}
+function MapaSelector({
+  value,
+  onChange,
+  onClose
+}) {
+  function pick(s) {
+    onChange({
+      seccion: s
+    });
+    onClose();
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "p-4 border-b border-zinc-800 flex justify-between items-center"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "font-black text-zinc-100 text-sm"
+  }, "Ubicacion en el negocio"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500 mt-0.5"
+  }, "Toca la seccion donde se encuentra")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "text-zinc-500 hover:text-zinc-200 text-xl leading-none ml-4"
+  }, "x")), /*#__PURE__*/React.createElement("div", {
+    className: "p-4"
+  }, /*#__PURE__*/React.createElement(MapaSVG, {
+    value: value,
+    onPick: pick
+  }), value?.seccion ? /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 bg-emerald-900/30 border border-emerald-800/40 rounded-lg px-3 py-2 text-center"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-emerald-400 font-bold"
+  }, "Seccion ", value.seccion, " seleccionada")) : /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-600 text-center mt-3"
+  }, "Toca una seccion del mapa"))));
+}
+function MiniMapa({
+  ubicacion
+}) {
+  if (!ubicacion?.seccion) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-1"
+  }, /*#__PURE__*/React.createElement(MapaSVG, {
+    value: ubicacion,
+    readonly: true
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-amber-400 font-bold text-center"
+  }, "📍 Seccion ", ubicacion.seccion));
+}
+function Login({
+  sellers,
+  onLogin
+}) {
+  const [sel, setSel] = useState("");
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState("");
+  const active = sellers.filter(s => s.activo);
+  function attempt() {
+    const v = active.find(s => s.id === sel);
+    if (!v) {
+      setErr("Selecciona un vendedor");
+      return;
+    }
+    if (v.pin !== pin) {
+      setErr("PIN incorrecto");
+      setPin("");
+      return;
+    }
+    onLogin(v);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen bg-zinc-950 flex items-center justify-center p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center mb-8"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-14 h-14 bg-amber-500 rounded-2xl flex items-center justify-center text-black font-black text-2xl mx-auto mb-4"
+  }, "D"), /*#__PURE__*/React.createElement("h1", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Deshuesadero"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm mt-1"
+  }, "Sistema de Precios e Inventario")), /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Quien eres?",
+    value: sel,
+    onChange: e => {
+      setSel(e.target.value);
+      setErr("");
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar..."), active.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.id,
+    value: s.id
+  }, s.nombre, s.rol === "admin" ? " (Admin)" : ""))), /*#__PURE__*/React.createElement(Inp, {
+    label: "PIN",
+    type: "password",
+    maxLength: 6,
+    value: pin,
+    onChange: e => {
+      setPin(e.target.value);
+      setErr("");
+    },
+    onKeyDown: e => e.key === "Enter" && attempt(),
+    placeholder: "****"
+  }), err && /*#__PURE__*/React.createElement("p", {
+    className: "text-red-400 text-xs font-semibold"
+  }, err), /*#__PURE__*/React.createElement(Btn, {
+    full: true,
+    onClick: attempt,
+    disabled: !sel || !pin
+  }, "Entrar"))));
+}
+function Dashboard({
+  trucks,
+  parts,
+  sales,
+  sellers,
+  clients,
+  user,
+  allData
+}) {
+  const fileRef = useRef(null);
+  const [msg, setMsg] = useState("");
+  const totalRec = sales.reduce((s, v) => s + v.precioFinal, 0);
+  const disponibles = parts.filter(p => p.estado === "disponible").length;
+  const nuevas = parts.filter(p => p.condicion === "N" && p.estado === "disponible").length;
+  const lentas = parts.filter(p => p.estado === "disponible" && p.rotacion === "lenta").length;
+  const byTruck = trucks.map(t => {
+    const tv = sales.filter(s => s.camionId === t.id).reduce((a, s) => a + s.precioFinal, 0);
+    return {
+      ...t,
+      tv,
+      pct: t.costoCompra > 0 ? Math.round(tv / t.costoCompra * 100) : 0
+    };
+  }).sort((a, b) => b.pct - a.pct);
+  const recent = [...sales].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5);
+  function handleRestore(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (d.sellers) allData.setSellers(d.sellers);
+        if (d.clients) allData.setClients(d.clients);
+        if (d.trucks) allData.setTrucks(d.trucks);
+        if (d.parts) allData.setParts(d.parts);
+        if (d.sales) allData.setSales(d.sales);
+        setMsg("Datos restaurados!");
+        setTimeout(() => setMsg(""), 3000);
+      } catch {
+        setMsg("Error al leer archivo");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-6"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Panel de Control"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, "Bienvenido, ", /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400"
+  }, user.nombre))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 md:grid-cols-4 gap-3"
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Camiones",
+    value: trucks.length,
+    sub: clients.length + " clientes"
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "En inventario",
+    value: disponibles,
+    sub: nuevas > 0 ? nuevas + " piezas nuevas" : undefined
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Piezas lentas",
+    value: lentas,
+    warn: lentas > 0
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Recuperado",
+    value: fmt(totalRec),
+    accent: true,
+    sub: sales.length + " ventas"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid md:grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xs font-bold text-zinc-400 uppercase mb-3"
+  }, "Recuperacion por Camion"), byTruck.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-600 text-sm"
+  }, "Sin datos"), byTruck.map(t => /*#__PURE__*/React.createElement("div", {
+    key: t.id,
+    className: "mb-3 last:mb-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between text-sm mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-200 font-semibold truncate"
+  }, t.nombre), /*#__PURE__*/React.createElement("span", {
+    className: "font-black ml-2 text-amber-400"
+  }, t.pct, "%")), /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-zinc-800 rounded-full h-1.5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-1.5 rounded-full " + (t.pct >= 100 ? "bg-emerald-500" : t.pct >= 50 ? "bg-amber-500" : "bg-red-500"),
+    style: {
+      width: Math.min(t.pct, 100) + "%"
+    }
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xs font-bold text-zinc-400 uppercase mb-3"
+  }, "Ultimas Ventas"), recent.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-600 text-sm"
+  }, "Sin ventas"), recent.map(v => /*#__PURE__*/React.createElement("div", {
+    key: v.id,
+    className: "flex justify-between items-center py-2 border-b border-zinc-800 last:border-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-zinc-200 truncate"
+  }, v.nombrePieza), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, v.fecha, " · ", v.vendedor)), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-amber-400 ml-3 shrink-0"
+  }, fmt(v.precioFinal)))))), user.rol === "admin" && /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xs font-bold text-zinc-400 uppercase mb-3"
+  }, "Respaldar y Exportar"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    size: "sm",
+    variant: "ghost",
+    onClick: () => exportarExcel(trucks, parts, sales, clients)
+  }, "📊 Exportar Excel"), /*#__PURE__*/React.createElement(Btn, {
+    size: "sm",
+    variant: "ghost",
+    onClick: () => respaldarJSON({
+      sellers,
+      clients,
+      trucks,
+      parts,
+      sales
+    })
+  }, "💾 Respaldar JSON"), /*#__PURE__*/React.createElement("button", {
+    className: "px-3 py-1.5 text-xs font-bold border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 rounded-lg transition",
+    onClick: () => fileRef.current && fileRef.current.click()
+  }, "📂 Restaurar JSON"), /*#__PURE__*/React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: ".json",
+    className: "hidden",
+    onChange: handleRestore
+  })), msg && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-emerald-400 font-bold mt-2"
+  }, msg), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-600 mt-2"
+  }, "Excel: 4 hojas (Camiones, Piezas, Ventas, Clientes). JSON: respaldo completo restaurable.")));
+}
+function Camiones({
+  trucks,
+  setTrucks,
+  parts,
+  setParts,
+  user
+}) {
+  const [vista, setVista] = useState(null);
+  const [modal, setModal] = useState(false);
+  const blank = {
+    nombre: "",
+    marca: "",
+    modelo: "",
+    anio: new Date().getFullYear(),
+    costoCompra: "",
+    precioVenta: "",
+    fechaEntrada: new Date().toISOString().slice(0, 10),
+    notas: "",
+    tipoVenta: "por_piezas"
+  };
+  const [form, setForm] = useState(blank);
+  const [pendingTruck, setPendingTruck] = useState(null);
+  const [showTruckMapa, setShowTruckMapa] = useState(false);
+  function saveTruck() {
+    if (!form.nombre || !form.costoCompra) return;
+    const t = {
+      ...form,
+      id: uid("T"),
+      costoCompra: Number(form.costoCompra),
+      precioVenta: form.precioVenta ? Number(form.precioVenta) : null,
+      anio: Number(form.anio),
+      creadoPor: user?.nombre || "Admin",
+      fechaRegistro: new Date().toISOString().slice(0, 10)
+    };
+    setTrucks(p => [...p, t]);
+    setModal(false);
+    setForm(blank);
+    setPendingTruck(t);
+    setVista({
+      tipo: "piezas",
+      truckId: t.id
+    });
+  }
+  function handleSaveParts(truckId, nuevas) {
+    setParts(p => [...p.filter(x => x.camionId !== truckId || x.estado === "vendida"), ...nuevas]);
+  }
+  const activeTruck = vista ? trucks.find(t => t.id === vista.truckId) || pendingTruck : null;
+  if (vista?.tipo === "piezas" && activeTruck) {
+    const existing = parts.filter(p => p.camionId === activeTruck.id);
+    return /*#__PURE__*/React.createElement(RegistroPiezas, {
+      truck: activeTruck,
+      existingParts: existing,
+      user: user,
+      onSave: p => {
+        handleSaveParts(activeTruck.id, p);
+        setVista({
+          tipo: "ficha",
+          truckId: activeTruck.id
+        });
+        setPendingTruck(null);
+      },
+      onClose: () => {
+        setVista(null);
+        setPendingTruck(null);
+      }
+    });
+  }
+  if (vista?.tipo === "ficha" && activeTruck) {
+    return /*#__PURE__*/React.createElement(FichaCamion, {
+      truck: activeTruck,
+      parts: parts,
+      onBack: () => setVista(null),
+      onEditPiezas: () => setVista({
+        tipo: "piezas",
+        truckId: activeTruck.id
+      })
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Camiones"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, trucks.length, " registrados")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setModal(true)
+  }, "+ Nuevo Camion")), trucks.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-16 text-zinc-600"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-4xl mb-2"
+  }, "🚛"), /*#__PURE__*/React.createElement("p", null, "Sin camiones")), /*#__PURE__*/React.createElement("div", {
+    className: "grid md:grid-cols-2 gap-3"
+  }, trucks.map(t => {
+    const tp = parts.filter(p => p.camionId === t.id);
+    const disp = tp.filter(p => p.estado === "disponible").length;
+    const vend = tp.filter(p => p.estado === "vendida").length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: t.id,
+      className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4 cursor-pointer hover:border-zinc-700 transition",
+      onClick: () => setVista({
+        tipo: "ficha",
+        truckId: t.id
+      })
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between items-start mb-2"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "font-black text-zinc-100"
+    }, t.nombre), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, t.id, " · ", t.fechaEntrada, t.creadoPor ? " · Reg. por " + t.creadoPor : "")), t.tipoVenta !== "por_piezas" && t.precioVenta ? /*#__PURE__*/React.createElement("p", {
+      className: "text-lg font-black text-amber-400"
+    }, fmt(t.precioVenta)) : /*#__PURE__*/React.createElement(Badge, {
+      color: "gray"
+    }, disp, " disp.")), /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-2 flex-wrap mb-3"
+    }, /*#__PURE__*/React.createElement(Badge, {
+      color: t.tipoVenta === "completo" ? "purple" : t.tipoVenta === "mixto" ? "amber" : "green"
+    }, TIPO_VENTA[t.tipoVenta] || t.tipoVenta), vend > 0 && /*#__PURE__*/React.createElement(Badge, {
+      color: "gray"
+    }, vend, " vendidas")), t.notas && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500 italic mb-3"
+    }, "\"", t.notas, "\""), /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-2",
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement(Btn, {
+      size: "sm",
+      variant: "ghost",
+      onClick: () => setVista({
+        tipo: "piezas",
+        truckId: t.id
+      })
+    }, "+ Piezas"), user.rol === "admin" && /*#__PURE__*/React.createElement(Btn, {
+      size: "sm",
+      variant: "danger",
+      onClick: () => {
+        if (!confirm("Eliminar camion?")) return;
+        setTrucks(p => p.filter(x => x.id !== t.id));
+      }
+    }, "Eliminar")));
+  })), modal && /*#__PURE__*/React.createElement(Modal, {
+    title: "Registrar Camion",
+    onClose: () => setModal(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre *",
+    value: form.nombre,
+    onChange: e => setForm(f => ({
+      ...f,
+      nombre: e.target.value
+    })),
+    placeholder: "Ej: Kenworth T800 2018"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: form.marca,
+    onChange: e => setForm(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Modelo",
+    value: form.modelo,
+    onChange: e => setForm(f => ({
+      ...f,
+      modelo: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Anio",
+    type: "number",
+    value: form.anio,
+    onChange: e => setForm(f => ({
+      ...f,
+      anio: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Costo de compra $*",
+    type: "number",
+    value: form.costoCompra,
+    onChange: e => setForm(f => ({
+      ...f,
+      costoCompra: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement(Sel, {
+    label: "Tipo de venta general",
+    value: form.tipoVenta,
+    onChange: e => setForm(f => ({
+      ...f,
+      tipoVenta: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "por_piezas"
+  }, "Por piezas"), /*#__PURE__*/React.createElement("option", {
+    value: "completo"
+  }, "Completo"), /*#__PURE__*/React.createElement("option", {
+    value: "mixto"
+  }, "Mixto — definir por sistema")), (form.tipoVenta === "completo" || form.tipoVenta === "mixto") && /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio de venta completo $",
+    type: "number",
+    value: form.precioVenta,
+    onChange: e => setForm(f => ({
+      ...f,
+      precioVenta: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Fecha de entrada",
+    type: "date",
+    value: form.fechaEntrada,
+    onChange: e => setForm(f => ({
+      ...f,
+      fechaEntrada: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Txta, {
+    label: "Notas",
+    value: form.notas,
+    onChange: e => setForm(f => ({
+      ...f,
+      notas: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowTruckMapa(true),
+    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg transition font-bold"
+  }, form.ubicacion ? "📍 Seccion " + form.ubicacion.seccion : "📍 Asignar ubicacion"), form.ubicacion && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      ubicacion: null
+    })),
+    className: "text-xs text-red-400"
+  }, "Quitar")), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500 bg-zinc-800 rounded-lg p-3"
+  }, "El precio de compra solo es visible en Rentabilidad."), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: saveTruck,
+    disabled: !form.nombre || !form.costoCompra
+  }, "Guardar y agregar piezas"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setModal(false)
+  }, "Cancelar")))), showTruckMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+    value: form.ubicacion,
+    onChange: v => {
+      setForm(f => ({
+        ...f,
+        ubicacion: v
+      }));
+      setShowTruckMapa(false);
+    },
+    onClose: () => setShowTruckMapa(false)
+  }));
+}
+function Inventario({
+  parts,
+  setParts,
+  trucks,
+  user
+}) {
+  const [fCamion, setFCamion] = useState("all");
+  const [fCat, setFCat] = useState("all");
+  const [fEstado, setFEstado] = useState("disponible");
+  const [fCond, setFCond] = useState("all");
+  const [search, setSearch] = useState("");
+  const [modalSuelta, setModalSuelta] = useState(false);
+  const [editSuelta, setEditSuelta] = useState(null);
+  const [editPart, setEditPart] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const blankS = {
+    sistema: Object.keys(CATS)[0],
+    nombre: "",
+    nombreCustom: "",
+    marca: "",
+    modelo: "",
+    condicion: "B",
+    precioBase: "",
+    precioMinimo: "",
+    rotacion: "media",
+    disponibilidad: "por_pieza",
+    libraje: "",
+    tipoRin: "",
+    llanAncho: "",
+    llanPerfil: "",
+    llanDiametro: "",
+    cantidad: 1
+  };
+  const [formS, setFormS] = useState(blankS);
+  const cfgS = PCFG[formS.nombre] || {};
+  const llanMedidaS = cfgS.isLlanta && formS.llanAncho ? formS.llanAncho + "/" + formS.llanPerfil + "R" + formS.llanDiametro : null;
+  function handleCatChange(cat) {
+    setFormS({
+      ...blankS,
+      sistema: cat
+    });
+  }
+  function handleNombreChange(nombre) {
+    setFormS(f => ({
+      ...f,
+      nombre,
+      nombreCustom: nombre === "__custom__" ? f.nombreCustom : "",
+      marca: "",
+      modelo: "",
+      libraje: "",
+      tipoRin: "",
+      llanAncho: "",
+      llanPerfil: "",
+      llanDiametro: ""
+    }));
+  }
+  function saveSuelta() {
+    const nombreFinal = formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
+    if (!nombreFinal || !formS.precioBase) return;
+    const base = Number(formS.precioBase);
+    const cfg = PCFG[nombreFinal] || {};
+    const medida = cfg.isLlanta && formS.llanAncho ? formS.llanAncho + "/" + formS.llanPerfil + "R" + formS.llanDiametro : formS.modelo;
+    const p = {
+      ...formS,
+      nombre: nombreFinal,
+      id: uid("P"),
+      camionId: null,
+      estado: "disponible",
+      fechaIngreso: new Date().toISOString().slice(0, 10),
+      precioBase: base,
+      precioMinimo: Number(formS.precioMinimo) || Math.round(base * 0.7),
+      modelo: medida,
+      esSuelta: true,
+      cantidad: Number(formS.cantidad) || 1,
+      creadoPor: user?.nombre || "Admin"
+    };
+    setParts(prev => [...prev, p]);
+    setModalSuelta(false);
+    setFormS(blankS);
+  }
+  function saveEditPart() {
+    if (!editForm || !editForm.precioBase) return;
+    const base = Number(editForm.precioBase);
+    setParts(p => p.map(x => x.id === editPart.id ? {
+      ...x,
+      ...editForm,
+      precioBase: base,
+      precioMinimo: Number(editForm.precioMinimo) || Math.round(base * 0.7),
+      cantidad: Number(editForm.cantidad) || 1
+    } : x));
+    setEditPart(null);
+    setEditForm(null);
+  }
+  function saveEditSuelta() {
+    const nombreFinal = formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
+    if (!nombreFinal || !formS.precioBase) return;
+    const base = Number(formS.precioBase);
+    const cfg = PCFG[nombreFinal] || {};
+    const medida = cfg.isLlanta && formS.llanAncho ? formS.llanAncho + "/" + formS.llanPerfil + "R" + formS.llanDiametro : formS.modelo;
+    setParts(prev => prev.map(x => x.id === editSuelta.id ? {
+      ...x,
+      ...formS,
+      nombre: nombreFinal,
+      precioBase: base,
+      precioMinimo: Number(formS.precioMinimo) || Math.round(base * 0.7),
+      modelo: medida,
+      cantidad: Number(formS.cantidad) || 1
+    } : x));
+    setEditSuelta(null);
+    setFormS(blankS);
+  }
+  const filtered = parts.filter(p => {
+    if (fCamion === "sueltas" && !p.esSuelta) return false;
+    if (fCamion !== "all" && fCamion !== "sueltas" && p.camionId !== fCamion) return false;
+    if (fEstado !== "all" && p.estado !== fEstado) return false;
+    if (fCat !== "all" && p.sistema !== fCat) return false;
+    if (fCond !== "all" && p.condicion !== fCond) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!p.nombre.toLowerCase().includes(q) && !p.sistema.toLowerCase().includes(q) && !(p.marca || "").toLowerCase().includes(q) && !(p.modelo || "").toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Inventario"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, parts.filter(p => p.estado === "disponible").length, " disponibles · ", filtered.length, " mostrando")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setModalSuelta(true)
+  }, "+ Pieza suelta")), /*#__PURE__*/React.createElement("input", {
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "Buscar por nombre, marca, modelo, sistema...",
+    className: "w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("select", {
+    value: fCamion,
+    onChange: e => setFCamion(e.target.value),
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todos los camiones"), /*#__PURE__*/React.createElement("option", {
+    value: "sueltas"
+  }, "Solo piezas sueltas"), trucks.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.id,
+    value: t.id
+  }, t.nombre))), /*#__PURE__*/React.createElement("select", {
+    value: fCat,
+    onChange: e => setFCat(e.target.value),
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todas las categorias"), Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement("select", {
+    value: fEstado,
+    onChange: e => setFEstado(e.target.value),
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todos"), /*#__PURE__*/React.createElement("option", {
+    value: "disponible"
+  }, "Disponibles"), /*#__PURE__*/React.createElement("option", {
+    value: "vendida"
+  }, "Vendidas")), /*#__PURE__*/React.createElement("select", {
+    value: fCond,
+    onChange: e => setFCond(e.target.value),
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todas las condiciones"), /*#__PURE__*/React.createElement("option", {
+    value: "N"
+  }, "N - Nueva"), /*#__PURE__*/React.createElement("option", {
+    value: "A"
+  }, "A - Excelente"), /*#__PURE__*/React.createElement("option", {
+    value: "B"
+  }, "B - Funcional"), /*#__PURE__*/React.createElement("option", {
+    value: "C"
+  }, "C - Reparar"))), filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-12 text-zinc-600"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-4xl mb-2"
+  }, "🔧"), /*#__PURE__*/React.createElement("p", null, "Sin piezas con estos filtros")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, filtered.map(p => {
+    const truck = p.camionId ? trucks.find(t => t.id === p.camionId) : null;
+    const a = adj(p.precioBase, p.condicion);
+    const rColor = {
+      rapida: "amber",
+      media: "blue",
+      lenta: "gray"
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: "bg-zinc-900 border rounded-xl p-4 transition " + (p.estado === "vendida" ? "border-zinc-800 opacity-50" : p.esSuelta ? "border-orange-800/40" : "border-zinc-800 hover:border-zinc-700")
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-wrap justify-between items-start gap-2"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex-1 min-w-0"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 flex-wrap mb-1"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-bold text-zinc-100"
+    }, p.nombre), (p.cantidad || 1) > 1 && /*#__PURE__*/React.createElement(Badge, {
+      color: "amber"
+    }, "x", p.cantidad), p.estado === "vendida" && /*#__PURE__*/React.createElement(Badge, {
+      color: "gray"
+    }, "Vendida"), p.esSuelta && /*#__PURE__*/React.createElement(Badge, {
+      color: "orange"
+    }, "Pieza suelta"), p.disponibilidad === "con_camion_completo" && /*#__PURE__*/React.createElement(Badge, {
+      color: "purple"
+    }, "Solo completo")), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500 mb-1"
+    }, p.esSuelta ? "Pieza suelta" : truck ? truck.nombre : p.camionId, " · ", p.sistema), p.creadoPor && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-600 mb-1"
+    }, "Registrado por: ", /*#__PURE__*/React.createElement("span", {
+      className: "text-zinc-400"
+    }, p.creadoPor), " · ", p.fechaIngreso), (p.marca || p.modelo) && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 mb-1"
+    }, p.marca, p.modelo ? " · " + p.modelo : ""), p.libraje && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 mb-1"
+    }, "Libraje: ", p.libraje), p.tipoRin && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 mb-1"
+    }, "Tipo: ", p.tipoRin), p.ubicacion && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-amber-400/80 mb-1"
+    }, "📍 Seccion ", p.ubicacion.seccion), /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-1.5 flex-wrap"
+    }, /*#__PURE__*/React.createElement(Badge, {
+      color: condColor(p.condicion)
+    }, condLabel(p.condicion)), /*#__PURE__*/React.createElement(Badge, {
+      color: rColor[p.rotacion]
+    }, ROT_LABEL[p.rotacion]))), /*#__PURE__*/React.createElement("div", {
+      className: "text-right shrink-0"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-lg font-black text-amber-400"
+    }, fmt(a)), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, "Base: ", fmt(p.precioBase)), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-red-400/80"
+    }, "Min: ", fmt(p.precioMinimo)))), p.estado === "disponible" && /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-2 mt-3 pt-3 border-t border-zinc-800",
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement(Btn, {
+      size: "sm",
+      variant: "ghost",
+      onClick: () => {
+        setEditPart(p);
+        setEditForm({
+          ...p,
+          precioBase: String(p.precioBase),
+          precioMinimo: String(p.precioMinimo),
+          cantidad: String(p.cantidad || 1)
+        });
+      }
+    }, "Editar"), /*#__PURE__*/React.createElement(Btn, {
+      size: "sm",
+      variant: "danger",
+      onClick: () => {
+        if (!confirm("Eliminar pieza?")) return;
+        setParts(prev => prev.filter(x => x.id !== p.id));
+      }
+    }, "Eliminar")));
+  })), editPart && editForm && /*#__PURE__*/React.createElement(Modal, {
+    title: "Editar: " + editPart.nombre,
+    onClose: () => {
+      setEditPart(null);
+      setEditForm(null);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre",
+    value: editForm.nombre || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: editForm.marca || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Modelo/Medida",
+    value: editForm.modelo || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      modelo: e.target.value
+    }))
+  })), editForm.libraje !== undefined && /*#__PURE__*/React.createElement(Inp, {
+    label: "Libraje",
+    value: editForm.libraje || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      libraje: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(CondSel, {
+    value: editForm.condicion || "B",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: editForm.precioBase || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Minimo $",
+    type: "number",
+    value: editForm.precioMinimo || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      precioMinimo: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Rotacion",
+    value: editForm.rotacion || "media",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      rotacion: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "rapida"
+  }, "Rapida"), /*#__PURE__*/React.createElement("option", {
+    value: "media"
+  }, "Media"), /*#__PURE__*/React.createElement("option", {
+    value: "lenta"
+  }, "Lenta")), /*#__PURE__*/React.createElement(Inp, {
+    label: "Cantidad",
+    type: "number",
+    value: editForm.cantidad || 1,
+    min: "1",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      cantidad: Number(e.target.value)
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditForm(f => ({
+      ...f,
+      _showMapa: true
+    })),
+    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg transition font-bold"
+  }, editForm.ubicacion ? "📍 Seccion " + editForm.ubicacion.seccion : "📍 Ubicacion"), editForm.ubicacion && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditForm(f => ({
+      ...f,
+      ubicacion: null
+    })),
+    className: "text-xs text-red-400"
+  }, "Quitar")), editForm._showMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+    value: editForm.ubicacion,
+    onChange: v => setEditForm(f => ({
+      ...f,
+      ubicacion: v,
+      _showMapa: false
+    })),
+    onClose: () => setEditForm(f => ({
+      ...f,
+      _showMapa: false
+    }))
+  }), /*#__PURE__*/React.createElement(Sel, {
+    label: "Disponibilidad",
+    value: editForm.disponibilidad || "por_pieza",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      disponibilidad: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "por_pieza"
+  }, "Por pieza"), /*#__PURE__*/React.createElement("option", {
+    value: "con_camion_completo"
+  }, "Solo con camion completo")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: saveEditPart,
+    disabled: !editForm.precioBase
+  }, "Guardar cambios"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      setEditPart(null);
+      setEditForm(null);
+    }
+  }, "Cancelar")))), editSuelta && /*#__PURE__*/React.createElement(Modal, {
+    title: "Editar: " + editSuelta.nombre,
+    onClose: () => {
+      setEditSuelta(null);
+      setFormS(blankS);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Categoria",
+    value: formS.sistema,
+    onChange: e => handleCatChange(e.target.value)
+  }, Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre",
+    value: formS.nombre || formS.nombreCustom || "",
+    onChange: e => setFormS(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: formS.marca || "",
+    onChange: e => setFormS(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Modelo/Medida",
+    value: formS.modelo || "",
+    onChange: e => setFormS(f => ({
+      ...f,
+      modelo: e.target.value
+    }))
+  })), (PCFG[formS.nombre] || {}).libraje && /*#__PURE__*/React.createElement(Inp, {
+    label: "Libraje",
+    value: formS.libraje || "",
+    onChange: e => setFormS(f => ({
+      ...f,
+      libraje: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(CondSel, {
+    value: formS.condicion,
+    onChange: e => setFormS(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: formS.precioBase || "",
+    onChange: e => setFormS(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Minimo $",
+    type: "number",
+    value: formS.precioMinimo || "",
+    onChange: e => setFormS(f => ({
+      ...f,
+      precioMinimo: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Rotacion",
+    value: formS.rotacion || "media",
+    onChange: e => setFormS(f => ({
+      ...f,
+      rotacion: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "rapida"
+  }, "Rapida"), /*#__PURE__*/React.createElement("option", {
+    value: "media"
+  }, "Media"), /*#__PURE__*/React.createElement("option", {
+    value: "lenta"
+  }, "Lenta")), /*#__PURE__*/React.createElement(Inp, {
+    label: "Cantidad",
+    type: "number",
+    value: formS.cantidad || 1,
+    min: "1",
+    onChange: e => setFormS(f => ({
+      ...f,
+      cantidad: Number(e.target.value)
+    }))
+  })), editSuelta && editSuelta.ubicacion && /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-xl p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-zinc-400 uppercase mb-2"
+  }, "Ubicacion actual"), /*#__PURE__*/React.createElement(MiniMapa, {
+    ubicacion: editSuelta.ubicacion
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: saveEditSuelta,
+    disabled: !formS.precioBase
+  }, "Guardar cambios"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      setEditSuelta(null);
+      setFormS(blankS);
+    }
+  }, "Cancelar")))), modalSuelta && /*#__PURE__*/React.createElement(Modal, {
+    title: "Agregar pieza suelta",
+    onClose: () => setModalSuelta(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Categoria",
+    value: formS.sistema,
+    onChange: e => handleCatChange(e.target.value)
+  }, Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement(Sel, {
+    label: "Pieza",
+    value: formS.nombre,
+    onChange: e => handleNombreChange(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar pieza..."), CATS[formS.sistema].map(n => /*#__PURE__*/React.createElement("option", {
+    key: n,
+    value: n
+  }, n)), /*#__PURE__*/React.createElement("option", {
+    value: "__custom__"
+  }, "Otra (personalizada)")), formS.nombre === "__custom__" && /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre personalizado *",
+    value: formS.nombreCustom,
+    onChange: e => setFormS(f => ({
+      ...f,
+      nombreCustom: e.target.value
+    }))
+  }), formS.nombre && formS.nombre !== "__custom__" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, cfgS.marcaOpts ? /*#__PURE__*/React.createElement(Sel, {
+    label: "Material",
+    value: formS.marca,
+    onChange: e => setFormS(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar..."), cfgS.marcaOpts.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o
+  }, o))) : /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: formS.marca,
+    onChange: e => setFormS(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), cfgS.isLlanta ? /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-xs text-zinc-400 uppercase"
+  }, "Medida"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1 items-center"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-zinc-100 text-sm w-14",
+    placeholder: "295",
+    value: formS.llanAncho,
+    onChange: e => setFormS(f => ({
+      ...f,
+      llanAncho: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "/"), /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-zinc-100 text-sm w-12",
+    placeholder: "75",
+    value: formS.llanPerfil,
+    onChange: e => setFormS(f => ({
+      ...f,
+      llanPerfil: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "R"), /*#__PURE__*/React.createElement("input", {
+    className: "bg-zinc-900 border border-zinc-700 rounded px-2 py-2 text-zinc-100 text-sm w-14",
+    placeholder: "22.5",
+    value: formS.llanDiametro,
+    onChange: e => setFormS(f => ({
+      ...f,
+      llanDiametro: e.target.value
+    }))
+  })), llanMedidaS && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-amber-400 font-bold"
+  }, llanMedidaS)) : /*#__PURE__*/React.createElement(Inp, {
+    label: cfgS.modeloLabel || "Modelo",
+    value: formS.modelo,
+    onChange: e => setFormS(f => ({
+      ...f,
+      modelo: e.target.value
+    }))
+  })), cfgS.tipoRin && /*#__PURE__*/React.createElement(Sel, {
+    label: "Tipo de rin",
+    value: formS.tipoRin,
+    onChange: e => setFormS(f => ({
+      ...f,
+      tipoRin: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar..."), cfgS.tipoRin.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o
+  }, o))), cfgS.libraje && /*#__PURE__*/React.createElement(Inp, {
+    label: "Libraje",
+    value: formS.libraje,
+    onChange: e => setFormS(f => ({
+      ...f,
+      libraje: e.target.value
+    })),
+    placeholder: "Ej: 3500 lb"
+  })), formS.nombre && /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(CondSel, {
+    value: formS.condicion,
+    onChange: e => setFormS(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: formS.precioBase,
+    onChange: e => setFormS(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Minimo $",
+    type: "number",
+    value: formS.precioMinimo,
+    onChange: e => setFormS(f => ({
+      ...f,
+      precioMinimo: e.target.value
+    })),
+    placeholder: "auto 70%"
+  })), formS.nombre && /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Rotacion",
+    value: formS.rotacion,
+    onChange: e => setFormS(f => ({
+      ...f,
+      rotacion: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "rapida"
+  }, "Rapida"), /*#__PURE__*/React.createElement("option", {
+    value: "media"
+  }, "Media"), /*#__PURE__*/React.createElement("option", {
+    value: "lenta"
+  }, "Lenta")), /*#__PURE__*/React.createElement(Inp, {
+    label: "Cantidad",
+    type: "number",
+    value: formS.cantidad || 1,
+    min: "1",
+    onChange: e => setFormS(f => ({
+      ...f,
+      cantidad: Math.max(1, Number(e.target.value))
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setFormS(f => ({
+      ...f,
+      _showMapa: true
+    })),
+    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg transition font-bold"
+  }, formS.ubicacion ? "📍 Seccion " + formS.ubicacion.seccion : "📍 Asignar ubicacion"), formS.ubicacion && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setFormS(f => ({
+      ...f,
+      ubicacion: null
+    })),
+    className: "text-xs text-red-400"
+  }, "Quitar")), formS._showMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+    value: formS.ubicacion,
+    onChange: v => setFormS(f => ({
+      ...f,
+      ubicacion: v,
+      _showMapa: false
+    })),
+    onClose: () => setFormS(f => ({
+      ...f,
+      _showMapa: false
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: saveSuelta,
+    disabled: !formS.nombre || formS.nombre === "__custom__" && !formS.nombreCustom || !formS.precioBase
+  }, "Guardar pieza"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setModalSuelta(false)
+  }, "Cancelar")))));
+}
+function Ventas({
+  sales,
+  setSales,
+  parts,
+  setParts,
+  trucks,
+  clients,
+  user
+}) {
+  const blank = {
+    piezaId: "",
+    clienteId: "",
+    precioFinal: "",
+    descuento: "0",
+    motivoDescuento: "",
+    canal: "Mostrador",
+    fecha: new Date().toISOString().slice(0, 10)
+  };
+  const blankNueva = {
+    sistema: Object.keys(CATS)[0],
+    nombre: "",
+    marca: "",
+    modelo: "",
+    condicion: "B",
+    precioBase: "",
+    camionId: ""
+  };
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState(blank);
+  const [ventaNueva, setVentaNueva] = useState(false);
+  const [formNueva, setFormNueva] = useState(blankNueva);
+  const [warn, setWarn] = useState("");
+  const [descWarn, setDescWarn] = useState("");
+  const disponibles = parts.filter(p => p.estado === "disponible");
+  const selPart = disponibles.find(p => p.id === form.piezaId);
+  const ajustado = selPart ? adj(selPart.precioBase, selPart.condicion) : 0;
+  const finalNum = Number(form.precioFinal) || 0;
+  const descNum = Number(form.descuento) || 0;
+  const descPct = ajustado > 0 ? Math.round(descNum / ajustado * 100) : 0;
+  useEffect(() => {
+    if (selPart && form.precioFinal) setWarn(finalNum < selPart.precioMinimo ? "Por debajo del minimo (" + fmt(selPart.precioMinimo) + ")" : "");else setWarn("");
+    if (selPart && descNum > 0 && user.rol !== "admin" && descPct > user.maxDescuento) setDescWarn("Tu limite es " + user.maxDescuento + "%");else setDescWarn("");
+  }, [form.precioFinal, form.piezaId, form.descuento]);
+  function save() {
+    if (!form.piezaId || !form.precioFinal || descWarn) return;
+    const v = {
+      id: uid("V"),
+      piezaId: form.piezaId,
+      camionId: selPart.camionId || null,
+      clienteId: form.clienteId || null,
+      nombrePieza: selPart.nombre,
+      precioBase: selPart.precioBase,
+      precioFinal: finalNum,
+      descuento: descNum,
+      motivoDescuento: form.motivoDescuento,
+      vendedorId: user.id,
+      vendedor: user.nombre,
+      canal: form.canal,
+      fecha: form.fecha
+    };
+    setSales(p => [...p, v]);
+    setParts(p => p.map(x => {
+      if (x.id !== form.piezaId) return x;
+      const qty = (x.cantidad || 1) - 1;
+      return qty > 0 ? {
+        ...x,
+        cantidad: qty
+      } : {
+        ...x,
+        estado: "vendida",
+        cantidad: 0
+      };
+    }));
+    setModal(false);
+    setForm(blank);
+  }
+  const recent = [...sales].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Ventas"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, sales.length, " registradas")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setModal(true),
+    disabled: disponibles.length === 0
+  }, "+ Registrar Venta")), sales.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-12 text-zinc-600"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-4xl mb-2"
+  }, "💰"), /*#__PURE__*/React.createElement("p", null, "Sin ventas")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, recent.map(v => {
+    const t = v.camionId ? trucks.find(x => x.id === v.camionId) : null;
+    const c = clients.find(x => x.id === v.clienteId);
+    return /*#__PURE__*/React.createElement("div", {
+      key: v.id,
+      className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between items-start flex-wrap gap-2"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "font-bold text-zinc-100"
+    }, v.nombrePieza), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, t ? t.nombre : "Pieza suelta", " · ", v.fecha, " · ", v.vendedor, " · ", v.canal), c && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-sky-400"
+    }, "👤 ", c.nombre), v.motivoDescuento && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 italic"
+    }, "Desc: ", v.motivoDescuento)), /*#__PURE__*/React.createElement("div", {
+      className: "text-right"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-lg font-black text-amber-400"
+    }, fmt(v.precioFinal)), v.descuento > 0 && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-red-400"
+    }, "-", fmt(v.descuento)))));
+  })), modal && /*#__PURE__*/React.createElement(Modal, {
+    title: "Registrar Venta",
+    onClose: () => setModal(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 mb-1"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setVentaNueva(false),
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (!ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "Pieza registrada"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setVentaNueva(true),
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "Pieza nueva")), !ventaNueva && /*#__PURE__*/React.createElement(Sel, {
+    label: "Pieza *",
+    value: form.piezaId,
+    onChange: e => setForm(f => ({
+      ...f,
+      piezaId: e.target.value,
+      precioFinal: ""
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar pieza..."), disponibles.map(p => {
+    const t = p.camionId ? trucks.find(t => t.id === p.camionId) : null;
+    return /*#__PURE__*/React.createElement("option", {
+      key: p.id,
+      value: p.id
+    }, p.nombre, p.marca ? " — " + p.marca : "", " (", t ? t.nombre : "Suelta", ") ", fmt(adj(p.precioBase, p.condicion)));
+  })), ventaNueva && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 bg-zinc-800 rounded-xl p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-amber-400 uppercase"
+  }, "Registrar pieza al momento"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Categoria",
+    value: formNueva.sistema,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      sistema: e.target.value
+    }))
+  }, Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre *",
+    value: formNueva.nombre,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: formNueva.marca,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(CondSel, {
+    value: formNueva.condicion,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: formNueva.precioBase,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Sel, {
+    label: "Camion (opcional)",
+    value: formNueva.camionId,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      camionId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Pieza suelta"), trucks.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.id,
+    value: t.id
+  }, t.nombre))))), selPart && /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-lg p-3 text-xs space-y-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "Precio ajustado:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold"
+  }, fmt(ajustado))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "Minimo:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-red-400 font-bold"
+  }, fmt(selPart.precioMinimo))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-400"
+  }, "Tu limite:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-300 font-bold"
+  }, user.rol === "admin" ? "Sin limite" : user.maxDescuento + "%"))), /*#__PURE__*/React.createElement(Sel, {
+    label: "Cliente (opcional)",
+    value: form.clienteId,
+    onChange: e => setForm(f => ({
+      ...f,
+      clienteId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Sin cliente"), clients.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.id
+  }, c.nombre))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio final $*",
+    type: "number",
+    value: form.precioFinal,
+    onChange: e => setForm(f => ({
+      ...f,
+      precioFinal: e.target.value
+    }))
+  }), warn && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-red-400 font-semibold"
+  }, warn), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Inp, {
+    label: "Descuento " + (descPct > 0 ? "(" + descPct + "%)" : ""),
+    type: "number",
+    value: form.descuento,
+    onChange: e => setForm(f => ({
+      ...f,
+      descuento: e.target.value
+    }))
+  }), descWarn && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-red-400 mt-1"
+  }, descWarn)), /*#__PURE__*/React.createElement(Inp, {
+    label: "Motivo",
+    value: form.motivoDescuento,
+    onChange: e => setForm(f => ({
+      ...f,
+      motivoDescuento: e.target.value
+    })),
+    placeholder: "Cliente frecuente..."
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Canal",
+    value: form.canal,
+    onChange: e => setForm(f => ({
+      ...f,
+      canal: e.target.value
+    }))
+  }, CANALES.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Fecha",
+    type: "date",
+    value: form.fecha,
+    onChange: e => setForm(f => ({
+      ...f,
+      fecha: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: save,
+    disabled: ventaNueva ? !formNueva.nombre || !formNueva.precioBase || !form.precioFinal : !form.piezaId || !form.precioFinal || !!descWarn
+  }, "Registrar"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setModal(false)
+  }, "Cancelar")))));
+}
+function Clientes({
+  clients,
+  setClients,
+  sales,
+  trucks
+}) {
+  const [modal, setModal] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState("");
+  const blank = {
+    nombre: "",
+    telefono: "",
+    tipo: "nuevo",
+    notas: "",
+    fechaRegistro: new Date().toISOString().slice(0, 10)
+  };
+  const [form, setForm] = useState(blank);
+  function save() {
+    if (!form.nombre) return;
+    setClients(p => [...p, {
+      ...form,
+      id: uid("C")
+    }]);
+    setModal(false);
+    setForm(blank);
+  }
+  const filtered = clients.filter(c => !search || c.nombre.toLowerCase().includes(search.toLowerCase()) || c.telefono.includes(search));
+  const sel = clients.find(c => c.id === selected);
+  const selSales = sel ? sales.filter(s => s.clienteId === sel.id) : [];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Clientes"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, clients.length, " registrados")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setModal(true)
+  }, "+ Nuevo Cliente")), /*#__PURE__*/React.createElement("input", {
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "Buscar...",
+    className: "w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, filtered.map(c => {
+    const cS = sales.filter(s => s.clienteId === c.id);
+    const cT = cS.reduce((a, s) => a + s.precioFinal, 0);
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4 cursor-pointer hover:border-zinc-700 transition",
+      onClick: () => setSelected(selected === c.id ? null : c.id)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between items-start flex-wrap gap-2"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 mb-1"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "font-black text-zinc-100"
+    }, c.nombre), /*#__PURE__*/React.createElement(Badge, {
+      color: TIPO_COLOR[c.tipo]
+    }, TIPO_CLIENTE[c.tipo])), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, c.telefono, " · Desde ", c.fechaRegistro), c.notas && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 italic mt-1"
+    }, "\"", c.notas, "\"")), /*#__PURE__*/React.createElement("div", {
+      className: "text-right"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-lg font-black text-amber-400"
+    }, cT > 0 ? fmt(cT) : "—"), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, cS.length, " compras"))), selected === c.id && sel && /*#__PURE__*/React.createElement("div", {
+      className: "mt-4 pt-4 border-t border-zinc-800",
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-xs font-bold text-zinc-400 uppercase mb-2"
+    }, "Historial"), selSales.length === 0 && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-600"
+    }, "Sin compras"), selSales.map(v => {
+      const t = v.camionId ? trucks.find(t => t.id === v.camionId) : null;
+      return /*#__PURE__*/React.createElement("div", {
+        key: v.id,
+        className: "flex justify-between text-sm py-1.5 border-b border-zinc-800 last:border-0"
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+        className: "text-zinc-200"
+      }, v.nombrePieza), /*#__PURE__*/React.createElement("p", {
+        className: "text-xs text-zinc-500"
+      }, v.fecha, " · ", t ? t.nombre : "Pieza suelta")), /*#__PURE__*/React.createElement("p", {
+        className: "text-amber-400 font-bold"
+      }, fmt(v.precioFinal)));
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "mt-3"
+    }, /*#__PURE__*/React.createElement(Btn, {
+      size: "sm",
+      variant: "danger",
+      onClick: () => {
+        setClients(p => p.filter(x => x.id !== c.id));
+        setSelected(null);
+      }
+    }, "Eliminar"))));
+  })), modal && /*#__PURE__*/React.createElement(Modal, {
+    title: "Nuevo Cliente",
+    onClose: () => setModal(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre *",
+    value: form.nombre,
+    onChange: e => setForm(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Telefono",
+    value: form.telefono,
+    onChange: e => setForm(f => ({
+      ...f,
+      telefono: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Sel, {
+    label: "Tipo",
+    value: form.tipo,
+    onChange: e => setForm(f => ({
+      ...f,
+      tipo: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "nuevo"
+  }, "Nuevo"), /*#__PURE__*/React.createElement("option", {
+    value: "frecuente"
+  }, "Frecuente"), /*#__PURE__*/React.createElement("option", {
+    value: "mayorista"
+  }, "Mayorista"))), /*#__PURE__*/React.createElement(Txta, {
+    label: "Notas",
+    value: form.notas,
+    onChange: e => setForm(f => ({
+      ...f,
+      notas: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Fecha",
+    type: "date",
+    value: form.fechaRegistro,
+    onChange: e => setForm(f => ({
+      ...f,
+      fechaRegistro: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: save,
+    disabled: !form.nombre
+  }, "Guardar"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setModal(false)
+  }, "Cancelar")))));
+}
+function Vendedores({
+  sellers,
+  setSellers,
+  user
+}) {
+  const [modal, setModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const blank = {
+    nombre: "",
+    rol: "vendedor",
+    pin: "",
+    maxDescuento: 10,
+    activo: true
+  };
+  const [form, setForm] = useState(blank);
+  if (user.rol !== "admin") return /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-20 text-zinc-600"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-4xl mb-2"
+  }, "🔒"), /*#__PURE__*/React.createElement("p", null, "Solo el Admin"));
+  function open(s = null) {
+    setEditId(s?.id || null);
+    setForm(s ? {
+      ...s
+    } : blank);
+    setModal(true);
+  }
+  function save() {
+    if (!form.nombre || !form.pin) return;
+    if (editId) setSellers(p => p.map(s => s.id === editId ? {
+      ...form,
+      id: editId
+    } : s));else setSellers(p => [...p, {
+      ...form,
+      id: uid("S")
+    }]);
+    setModal(false);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Vendedores")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => open()
+  }, "+ Nuevo")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, sellers.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    className: "bg-zinc-900 border rounded-xl p-4 " + (s.activo ? "border-zinc-800" : "border-zinc-800/40 opacity-50")
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-start flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-black text-zinc-100"
+  }, s.nombre), s.rol === "admin" ? /*#__PURE__*/React.createElement(Badge, {
+    color: "amber"
+  }, "Admin") : /*#__PURE__*/React.createElement(Badge, {
+    color: "blue"
+  }, "Vendedor")), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "PIN: ", "*".repeat(s.pin.length), " · Desc max: ", s.maxDescuento, "%")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    size: "sm",
+    variant: "ghost",
+    onClick: () => open(s)
+  }, "Editar"), s.id !== user.id && /*#__PURE__*/React.createElement(Btn, {
+    size: "sm",
+    variant: s.activo ? "danger" : "ghost",
+    onClick: () => setSellers(p => p.map(x => x.id === s.id ? {
+      ...x,
+      activo: !x.activo
+    } : x))
+  }, s.activo ? "Desactivar" : "Activar")))))), modal && /*#__PURE__*/React.createElement(Modal, {
+    title: editId ? "Editar" : "Nuevo Vendedor",
+    onClose: () => setModal(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre *",
+    value: form.nombre,
+    onChange: e => setForm(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Rol",
+    value: form.rol,
+    onChange: e => setForm(f => ({
+      ...f,
+      rol: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "vendedor"
+  }, "Vendedor"), /*#__PURE__*/React.createElement("option", {
+    value: "admin"
+  }, "Admin")), /*#__PURE__*/React.createElement(Inp, {
+    label: "PIN *",
+    type: "password",
+    maxLength: 6,
+    value: form.pin,
+    onChange: e => setForm(f => ({
+      ...f,
+      pin: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement(Inp, {
+    label: "Desc max: " + form.maxDescuento + "%",
+    type: "range",
+    min: 0,
+    max: 100,
+    value: form.maxDescuento,
+    onChange: e => setForm(f => ({
+      ...f,
+      maxDescuento: Number(e.target.value)
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: save,
+    disabled: !form.nombre || !form.pin
+  }, editId ? "Guardar" : "Crear"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setModal(false)
+  }, "Cancelar")))));
+}
+function Rentabilidad({
+  trucks,
+  parts,
+  sales,
+  user
+}) {
+  const [selected, setSelected] = useState(null);
+  if (user.rol !== "admin") return /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-20 text-zinc-600"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-4xl mb-2"
+  }, "🔒"), /*#__PURE__*/React.createElement("p", null, "Solo el Admin"));
+  const totalInv = trucks.reduce((a, t) => a + t.costoCompra, 0);
+  const totalRec = sales.reduce((a, v) => a + v.precioFinal, 0);
+  const sueltas = parts.filter(p => p.esSuelta && p.estado === "disponible");
+  const valorSueltas = sueltas.reduce((a, p) => a + adj(p.precioBase, p.condicion), 0);
+  const data = trucks.map(t => {
+    const tp = parts.filter(p => p.camionId === t.id);
+    const ts = sales.filter(s => s.camionId === t.id);
+    const rec = ts.reduce((a, s) => a + s.precioFinal, 0);
+    const inv = tp.filter(p => p.estado === "disponible").reduce((a, p) => a + adj(p.precioBase, p.condicion), 0);
+    return {
+      ...t,
+      partsCount: tp.length,
+      vendidas: tp.filter(p => p.estado === "vendida").length,
+      recuperado: rec,
+      enInventario: inv,
+      utilidad: rec - t.costoCompra,
+      pct: t.costoCompra > 0 ? Math.round(rec / t.costoCompra * 100) : 0,
+      ventas: ts,
+      parts: tp
+    };
+  }).sort((a, b) => b.pct - a.pct);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Rentabilidad"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, "Solo visible para Admin")), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(KPI, {
+    label: "Total invertido",
+    value: fmt(totalInv)
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: "Total recuperado",
+    value: fmt(totalRec),
+    accent: true
+  }), /*#__PURE__*/React.createElement(KPI, {
+    label: totalRec >= totalInv ? "Utilidad" : "Por recuperar",
+    value: fmt(Math.abs(totalRec - totalInv)),
+    accent: totalRec >= totalInv,
+    warn: totalRec < totalInv
+  })), sueltas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "bg-orange-900/20 border border-orange-800/40 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-orange-300 font-bold text-sm"
+  }, "Piezas sueltas: ", sueltas.length, " · valor ", fmt(valorSueltas))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, data.map(t => /*#__PURE__*/React.createElement("div", {
+    key: t.id,
+    className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4 cursor-pointer hover:border-zinc-700 transition",
+    onClick: () => setSelected(selected === t.id ? null : t.id)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap justify-between items-start gap-2 mb-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "font-black text-zinc-100"
+  }, t.nombre), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3 mt-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-zinc-500"
+  }, "Compra: ", /*#__PURE__*/React.createElement("span", {
+    className: "text-red-400 font-bold"
+  }, fmt(t.costoCompra))), t.precioVenta && /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-zinc-500"
+  }, "Venta: ", /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold"
+  }, fmt(t.precioVenta))))), /*#__PURE__*/React.createElement("div", {
+    className: "text-right"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xl font-black " + (t.utilidad >= 0 ? "text-emerald-400" : "text-red-400")
+  }, t.utilidad >= 0 ? "+" : "-", fmt(Math.abs(t.utilidad))), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, t.pct, "% recuperado"))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full bg-zinc-800 rounded-full h-2 mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-2 rounded-full " + (t.pct >= 100 ? "bg-emerald-500" : t.pct >= 50 ? "bg-amber-500" : "bg-red-500"),
+    style: {
+      width: Math.min(t.pct, 100) + "%"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-2 text-center"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-zinc-100"
+  }, fmt(t.recuperado)), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Recuperado")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-zinc-100"
+  }, fmt(t.enInventario)), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "En inventario")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-zinc-100"
+  }, t.vendidas, "/", t.partsCount), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Vendidas"))), selected === t.id && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 pt-4 border-t border-zinc-800",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-zinc-400 uppercase mb-2"
+  }, "Ventas"), t.ventas.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-600"
+  }, "Sin ventas"), t.ventas.map(v => /*#__PURE__*/React.createElement("div", {
+    key: v.id,
+    className: "flex justify-between text-sm py-1 border-b border-zinc-800 last:border-0"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-300"
+  }, v.nombrePieza), /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold"
+  }, fmt(v.precioFinal)))))))));
+}
+
+// ─── UNIDADES COMPLETAS ───────────────────────────────────────────
+function UnidadesCompletas({
+  parts,
+  setParts,
+  trucks,
+  user
+}) {
+  const [modal, setModal] = useState(false);
+  const [showMapa, setShowMapa] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const blank = {
+    tipo: "Motor completo",
+    marca: "",
+    modelo: "",
+    condicion: "B",
+    precioBase: "",
+    precioMinimo: "",
+    rotacion: "media",
+    camionId: "",
+    notas: "",
+    ubicacion: null,
+    checklist: {}
+  };
+  const [form, setForm] = useState(blank);
+  const unidades = parts.filter(p => p.esUnidad);
+  function initChecklist(tipo) {
+    const items = UNIDADES_TIPOS[tipo] || [];
+    const cl = {};
+    items.forEach(i => cl[i] = false);
+    return cl;
+  }
+  function handleTipo(tipo) {
+    setForm(f => ({
+      ...f,
+      tipo,
+      checklist: initChecklist(tipo)
+    }));
+  }
+  function toggleCheck(item) {
+    setForm(f => ({
+      ...f,
+      checklist: {
+        ...f.checklist,
+        [item]: !f.checklist[item]
+      }
+    }));
+  }
+  function save() {
+    if (!form.precioBase) return;
+    const base = Number(form.precioBase);
+    const cl = form.checklist && Object.keys(form.checklist).length > 0 ? form.checklist : initChecklist(form.tipo);
+    const u = {
+      ...form,
+      id: uid("U"),
+      camionId: form.camionId || null,
+      estado: "disponible",
+      fechaIngreso: new Date().toISOString().slice(0, 10),
+      precioBase: base,
+      precioMinimo: Number(form.precioMinimo) || Math.round(base * 0.7),
+      esSuelta: !form.camionId,
+      esUnidad: true,
+      checklist: cl,
+      nombre: form.tipo,
+      sistema: "Unidad Completa"
+    };
+    setParts(p => [...p, u]);
+    setModal(false);
+    setForm(blank);
+  }
+  const items = UNIDADES_TIPOS[form.tipo] || [];
+  const checkedCount = form.checklist ? Object.values(form.checklist).filter(Boolean).length : 0;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-2xl font-black text-zinc-100"
+  }, "Unidades Completas"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-sm"
+  }, unidades.length, " registradas")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setForm({
+        ...blank,
+        checklist: initChecklist("Motor completo")
+      });
+      setModal(true);
+    }
+  }, "+ Nueva Unidad")), unidades.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-16 text-zinc-600"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-4xl mb-2"
+  }, "🔩"), /*#__PURE__*/React.createElement("p", null, "Sin unidades registradas"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mt-1"
+  }, "Motores completos, transmisiones, diferenciales, cabinas o chasis")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, unidades.map(u => {
+    const truck = u.camionId ? trucks.find(t => t.id === u.camionId) : null;
+    const items2 = UNIDADES_TIPOS[u.tipo] || [];
+    const totalI = items2.length;
+    const checkedI = u.checklist ? Object.values(u.checklist).filter(Boolean).length : 0;
+    const pct = totalI > 0 ? Math.round(checkedI / totalI * 100) : 0;
+    const isOpen = selected === u.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: u.id,
+      className: "bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "p-4 cursor-pointer hover:bg-zinc-800/50 transition",
+      onClick: () => setSelected(isOpen ? null : u.id)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between items-start flex-wrap gap-2 mb-2"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 mb-1"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "font-black text-zinc-100"
+    }, u.tipo), /*#__PURE__*/React.createElement(Badge, {
+      color: u.estado === "vendida" ? "gray" : "green"
+    }, u.estado === "vendida" ? "Vendida" : "Disponible"), u.condicion === "N" && /*#__PURE__*/React.createElement(Badge, {
+      color: "green"
+    }, "Nueva")), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, u.id, " · ", u.marca, " ", u.modelo, " · ", truck ? truck.nombre : "Pieza suelta"), u.ubicacion && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-amber-400/80 mt-0.5"
+    }, "📍 Seccion ", u.ubicacion.seccion)), /*#__PURE__*/React.createElement("div", {
+      className: "text-right"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-xl font-black text-amber-400"
+    }, fmt(adj(u.precioBase, u.condicion))), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-500"
+    }, "Min: ", fmt(u.precioMinimo)))), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex-1 bg-zinc-800 rounded-full h-1.5"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "h-1.5 rounded-full " + (pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500"),
+      style: {
+        width: pct + "%"
+      }
+    })), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 shrink-0"
+    }, checkedI, "/", totalI, " piezas"))), isOpen && /*#__PURE__*/React.createElement("div", {
+      className: "border-t border-zinc-800 p-4 space-y-4"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "text-xs font-bold text-zinc-400 uppercase mb-2"
+    }, "Checklist de piezas"), /*#__PURE__*/React.createElement("div", {
+      className: "grid grid-cols-2 gap-1.5"
+    }, items2.map(item => {
+      const tiene = u.checklist ? u.checklist[item] : false;
+      return /*#__PURE__*/React.createElement("div", {
+        key: item,
+        className: "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs " + (tiene ? "bg-emerald-900/30 text-emerald-300" : "bg-zinc-800/50 text-zinc-500")
+      }, /*#__PURE__*/React.createElement("span", null, tiene ? "✓" : "—"), /*#__PURE__*/React.createElement("span", null, item));
+    }))), u.ubicacion && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "text-xs font-bold text-zinc-400 uppercase mb-2"
+    }, "Ubicacion en el negocio"), /*#__PURE__*/React.createElement(MiniMapa, {
+      ubicacion: u.ubicacion
+    })), u.notas && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-400 italic"
+    }, "\"", u.notas, "\""), user.rol === "admin" && /*#__PURE__*/React.createElement(Btn, {
+      size: "sm",
+      variant: "danger",
+      onClick: () => {
+        if (!confirm("Eliminar unidad?")) return;
+        setParts(p => p.filter(x => x.id !== u.id));
+      }
+    }, "Eliminar")));
+  })), modal && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-screen overflow-y-auto"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-950"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-black text-zinc-100"
+  }, "Nueva Unidad Completa"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setModal(false),
+    className: "text-zinc-500 hover:text-zinc-200 text-2xl"
+  }, "x")), /*#__PURE__*/React.createElement("div", {
+    className: "p-5 space-y-4"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Tipo de unidad",
+    value: form.tipo,
+    onChange: e => handleTipo(e.target.value)
+  }, Object.keys(UNIDADES_TIPOS).map(t => /*#__PURE__*/React.createElement("option", {
+    key: t
+  }, t))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: form.marca,
+    onChange: e => setForm(f => ({
+      ...f,
+      marca: e.target.value
+    })),
+    placeholder: "Ej: Cummins"
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Modelo",
+    value: form.modelo,
+    onChange: e => setForm(f => ({
+      ...f,
+      modelo: e.target.value
+    })),
+    placeholder: "Ej: ISX15"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(CondSel, {
+    value: form.condicion,
+    onChange: e => setForm(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio $",
+    type: "number",
+    value: form.precioBase,
+    onChange: e => setForm(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Minimo $",
+    type: "number",
+    value: form.precioMinimo,
+    onChange: e => setForm(f => ({
+      ...f,
+      precioMinimo: e.target.value
+    })),
+    placeholder: "auto 70%"
+  })), /*#__PURE__*/React.createElement(Sel, {
+    label: "Camion de origen (opcional)",
+    value: form.camionId,
+    onChange: e => setForm(f => ({
+      ...f,
+      camionId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Sin camion (pieza suelta)"), trucks.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.id,
+    value: t.id
+  }, t.nombre))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-400 uppercase font-bold mb-2"
+  }, "Checklist — ", checkedCount, "/", items.length, " piezas"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto"
+  }, items.map(item => {
+    const checked = form.checklist ? form.checklist[item] || false : false;
+    return /*#__PURE__*/React.createElement("button", {
+      key: item,
+      onClick: () => toggleCheck(item),
+      className: "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition " + (checked ? "bg-emerald-900/40 border border-emerald-700 text-emerald-300" : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-amber-500")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "shrink-0"
+    }, checked ? "✓" : "○"), /*#__PURE__*/React.createElement("span", null, item));
+  }), (form.customItems || []).map((item, i) => {
+    const checked = form.checklist ? form.checklist[item] || false : false;
+    return /*#__PURE__*/React.createElement("div", {
+      key: "custom-" + i,
+      className: "flex items-center gap-1"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggleCheck(item),
+      className: "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition " + (checked ? "bg-emerald-900/40 border border-emerald-700 text-emerald-300" : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-amber-500")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "shrink-0"
+    }, checked ? "✓" : "○"), /*#__PURE__*/React.createElement("span", null, item)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setForm(f => ({
+        ...f,
+        customItems: (f.customItems || []).filter((_, j) => j !== i),
+        checklist: {
+          ...f.checklist,
+          [item]: undefined
+        }
+      })),
+      className: "text-red-400 text-xs px-1"
+    }, "x"));
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const n = prompt("Nombre de la pieza:");
+      if (n && n.trim()) {
+        setForm(f => ({
+          ...f,
+          customItems: [...(f.customItems || []), n.trim()],
+          checklist: {
+            ...f.checklist,
+            [n.trim()]: false
+          }
+        }));
+      }
+    },
+    className: "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs border border-dashed border-zinc-600 text-zinc-500 hover:border-amber-500 hover:text-amber-400 transition col-span-2"
+  }, /*#__PURE__*/React.createElement("span", null, "+"), /*#__PURE__*/React.createElement("span", null, "Agregar pieza personalizada")))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-2"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-400 uppercase font-bold"
+  }, "Ubicacion"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowMapa(true),
+    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-2 py-1 rounded transition font-bold"
+  }, form.ubicacion ? "📍 Seccion " + form.ubicacion.seccion : "📍 Asignar"), form.ubicacion && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      ubicacion: null
+    })),
+    className: "text-xs text-red-400"
+  }, "Quitar"))), /*#__PURE__*/React.createElement(Txta, {
+    label: "Notas",
+    value: form.notas,
+    onChange: e => setForm(f => ({
+      ...f,
+      notas: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: save,
+    disabled: !form.precioBase
+  }, "Guardar Unidad"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => setModal(false)
+  }, "Cancelar"))))), showMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+    value: form.ubicacion,
+    onChange: v => setForm(f => ({
+      ...f,
+      ubicacion: v
+    })),
+    onClose: () => setShowMapa(false)
+  }));
+}
+function App() {
+  const [sellers, setSellers] = useState(() => loadData("sellers") ?? SEED_SELLERS);
+  const [clients, setClients] = useState(() => loadData("clients") ?? SEED_CLIENTS);
+  const [trucks, setTrucks] = useState(() => loadData("trucks") ?? SEED_TRUCKS);
+  const [parts, setParts] = useState(() => loadData("parts") ?? SEED_PARTS);
+  const [sales, setSales] = useState(() => loadData("sales") ?? SEED_SALES);
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState("dashboard");
+  useEffect(() => {
+    saveData("sellers", sellers);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("sellers", sellers);
+  }, [sellers]);
+  useEffect(() => {
+    saveData("clients", clients);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("clients", clients);
+  }, [clients]);
+  useEffect(() => {
+    saveData("trucks", trucks);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("trucks", trucks);
+  }, [trucks]);
+  useEffect(() => {
+    saveData("parts", parts);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("parts", parts);
+  }, [parts]);
+  useEffect(() => {
+    saveData("sales", sales);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("sales", sales);
+  }, [sales]);
+  if (!user) return /*#__PURE__*/React.createElement(Login, {
+    sellers: sellers,
+    onLogin: setUser
+  });
+  const nav = [{
+    id: "dashboard",
+    icon: "",
+    label: "Panel"
+  }, {
+    id: "camiones",
+    icon: "",
+    label: "Camiones"
+  }, {
+    id: "inventario",
+    icon: "",
+    label: "Inventario"
+  }, {
+    id: "unidades",
+    icon: "",
+    label: "Unidades"
+  }, {
+    id: "ventas",
+    icon: "",
+    label: "Ventas"
+  }, {
+    id: "clientes",
+    icon: "",
+    label: "Clientes"
+  }, ...(user.rol === "admin" ? [{
+    id: "vendedores",
+    icon: "",
+    label: "Vendedores"
+  }, {
+    id: "rentabilidad",
+    icon: "",
+    label: "Rentabilidad"
+  }] : [])];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen bg-zinc-950 text-zinc-100 flex flex-col"
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "border-b border-zinc-800 bg-zinc-950 sticky top-0 z-40"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "max-w-5xl mx-auto px-4 py-3 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-black font-black text-sm"
+  }, "D"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "font-black text-zinc-100 text-sm leading-none"
+  }, "DESHUESADERO"), /*#__PURE__*/React.createElement("p", {
+    className: "text-zinc-500 text-xs"
+  }, "Sistema de Inventario"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-zinc-500 hidden sm:block"
+  }, user.nombre, user.rol === "admin" ? " (Admin)" : ""), /*#__PURE__*/React.createElement(Btn, {
+    size: "sm",
+    variant: "ghost",
+    onClick: () => setUser(null)
+  }, "Salir")))), /*#__PURE__*/React.createElement("nav", {
+    className: "border-b border-zinc-800 bg-zinc-950 sticky top-14 z-40"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "max-w-5xl mx-auto px-4 flex gap-1 overflow-x-auto"
+  }, nav.map(n => /*#__PURE__*/React.createElement("button", {
+    key: n.id,
+    onClick: () => setView(n.id),
+    className: "px-4 py-3 text-xs font-bold whitespace-nowrap transition border-b-2 -mb-px " + (view === n.id ? "border-amber-500 text-amber-400" : "border-transparent text-zinc-500 hover:text-zinc-300")
+  }, n.label)))), /*#__PURE__*/React.createElement("main", {
+    className: "max-w-5xl mx-auto px-4 py-6 w-full flex-1"
+  }, view === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
+    trucks: trucks,
+    parts: parts,
+    sales: sales,
+    sellers: sellers,
+    clients: clients,
+    user: user,
+    allData: {
+      setSellers,
+      setClients,
+      setTrucks,
+      setParts,
+      setSales
+    }
+  }), view === "camiones" && /*#__PURE__*/React.createElement(Camiones, {
+    trucks: trucks,
+    setTrucks: setTrucks,
+    parts: parts,
+    setParts: setParts,
+    user: user
+  }), view === "inventario" && /*#__PURE__*/React.createElement(Inventario, {
+    parts: parts,
+    setParts: setParts,
+    trucks: trucks,
+    user: user
+  }), view === "unidades" && /*#__PURE__*/React.createElement(UnidadesCompletas, {
+    parts: parts,
+    setParts: setParts,
+    trucks: trucks,
+    user: user
+  }), view === "ventas" && /*#__PURE__*/React.createElement(Ventas, {
+    sales: sales,
+    setSales: setSales,
+    parts: parts,
+    setParts: setParts,
+    trucks: trucks,
+    clients: clients,
+    user: user
+  }), view === "clientes" && /*#__PURE__*/React.createElement(Clientes, {
+    clients: clients,
+    setClients: setClients,
+    sales: sales,
+    trucks: trucks
+  }), view === "vendedores" && user.rol === "admin" && /*#__PURE__*/React.createElement(Vendedores, {
+    sellers: sellers,
+    setSellers: setSellers,
+    user: user
+  }), view === "rentabilidad" && user.rol === "admin" && /*#__PURE__*/React.createElement(Rentabilidad, {
+    trucks: trucks,
+    parts: parts,
+    sales: sales,
+    user: user
+  })), /*#__PURE__*/React.createElement("footer", {
+    className: "border-t border-zinc-800 py-3 text-center text-zinc-700 text-xs"
+  }, "Deshuesadero - Sistema de Inventario"));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
 </head>
 <body>
 <div id="root"></div>
@@ -3629,18 +7395,23 @@ function App() {
   const [view, setView] = useState("dashboard");
   useEffect(() => {
     saveData("sellers", sellers);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("sellers", sellers);
   }, [sellers]);
   useEffect(() => {
     saveData("clients", clients);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("clients", clients);
   }, [clients]);
   useEffect(() => {
     saveData("trucks", trucks);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("trucks", trucks);
   }, [trucks]);
   useEffect(() => {
     saveData("parts", parts);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("parts", parts);
   }, [parts]);
   useEffect(() => {
     saveData("sales", sales);
+    if(window.dbHelpers) window.dbHelpers.saveToFirebase("sales", sales);
   }, [sales]);
   if (!user) return /*#__PURE__*/React.createElement(Login, {
     sellers: sellers,
