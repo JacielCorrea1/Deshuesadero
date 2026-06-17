@@ -229,22 +229,8 @@ const SEED_SELLERS = [{
   id: "S001",
   nombre: "Admin",
   rol: "admin",
-  pin: "1234",
+  pin: "1994",
   maxDescuento: 100,
-  activo: true
-}, {
-  id: "S002",
-  nombre: "Carlos",
-  rol: "vendedor",
-  pin: "2222",
-  maxDescuento: 10,
-  activo: true
-}, {
-  id: "S003",
-  nombre: "Luis",
-  rol: "vendedor",
-  pin: "3333",
-  maxDescuento: 15,
   activo: true
 }];
 const SEED_CLIENTS = [{
@@ -820,7 +806,8 @@ function RegistroPiezas({
   truck,
   existingParts,
   onSave,
-  onClose
+  onClose,
+  user
 }) {
   const catKeys = Object.keys(CATS);
   const [activeCat, setActiveCat] = useState(catKeys[0]);
@@ -828,6 +815,17 @@ function RegistroPiezas({
     ...p
   })) : []);
   const [activeForm, setActiveForm] = useState(null);
+  const [catModos, setCatModos] = useState({}); // {cat: "piezas"|"completo"}
+  function getCatModo(cat) {
+    return catModos[cat] || "piezas";
+  }
+  function toggleCatModo(cat) {
+    setCatModos(m => ({
+      ...m,
+      [cat]: m[cat] === "completo" ? "piezas" : "completo"
+    }));
+    setActiveForm(null);
+  }
   const defDisp = truck ? truck.tipoVenta === "completo" ? "con_camion_completo" : "por_pieza" : "por_pieza";
   const blankF = {
     nombre: "",
@@ -893,7 +891,8 @@ function RegistroPiezas({
       precioMinimo: Number(form.precioMinimo) || Math.round(base * 0.7),
       modelo: medida,
       esSuelta: !truck,
-      cantidad: Number(form.cantidad) || 1
+      cantidad: Number(form.cantidad) || 1,
+      creadoPor: user?.nombre || "Admin"
     };
     setPiezas(p => [...p.filter(x => !(x.sistema === activeCat && x.nombre === form.nombre)), part]);
     setActiveForm(null);
@@ -935,23 +934,88 @@ function RegistroPiezas({
     className: "flex gap-1.5"
   }, catKeys.map(cat => {
     const cnt = piezas.filter(p => p.sistema === cat).length;
+    const isCompleto = getCatModo(cat) === "completo";
     return /*#__PURE__*/React.createElement("button", {
       key: cat,
       onClick: () => {
         setActiveCat(cat);
         setActiveForm(null);
       },
-      className: "px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition flex items-center gap-1.5 " + (activeCat === cat ? "bg-amber-500 text-black" : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200")
-    }, cat, cnt > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition flex items-center gap-1.5 " + (activeCat === cat ? "bg-amber-500 text-black" : isCompleto ? "bg-purple-900/50 border border-purple-700 text-purple-300" : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200")
+    }, cat, isCompleto && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs"
+    }, "★"), cnt > 0 && /*#__PURE__*/React.createElement("span", {
       className: "rounded-full px-1.5 text-xs " + (activeCat === cat ? "bg-black/30" : "bg-emerald-500 text-black")
     }, cnt));
   }))), /*#__PURE__*/React.createElement("div", {
     className: "flex-1 overflow-y-auto px-4 py-4 max-w-3xl mx-auto w-full"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-bold text-zinc-400 uppercase mb-3"
-  }, activeCat), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-zinc-400 uppercase"
+  }, activeCat), /*#__PURE__*/React.createElement("button", {
+    onClick: () => toggleCatModo(activeCat),
+    className: "text-xs font-bold px-3 py-1 rounded-lg border transition " + (getCatModo(activeCat) === "completo" ? "bg-purple-900/50 border-purple-600 text-purple-300" : "border-zinc-700 text-zinc-400 hover:border-amber-500 hover:text-amber-400")
+  }, getCatModo(activeCat) === "completo" ? "★ Sistema completo" : "☆ Marcar como completo")), getCatModo(activeCat) === "completo" && (() => {
+    const items = CATS[activeCat];
+    const checklist = piezas.find(p => p.sistema === activeCat && p.esChecklist);
+    const checked = checklist?.checklist || {};
+    return /*#__PURE__*/React.createElement("div", {
+      className: "space-y-3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "grid grid-cols-2 gap-1.5"
+    }, items.map(item => /*#__PURE__*/React.createElement("button", {
+      key: item,
+      onClick: () => {
+        const newChecked = {
+          ...checked,
+          [item]: !checked[item]
+        };
+        const existing = piezas.find(p => p.sistema === activeCat && p.esChecklist);
+        if (existing) {
+          setPiezas(p => p.map(x => x.sistema === activeCat && x.esChecklist ? {
+            ...x,
+            checklist: newChecked
+          } : x));
+        } else {
+          setPiezas(p => [...p, {
+            id: uid("CL"),
+            camionId: truck?.id,
+            sistema: activeCat,
+            nombre: activeCat + " completo",
+            esChecklist: true,
+            checklist: newChecked,
+            condicion: "B",
+            precioBase: 0,
+            precioMinimo: 0,
+            rotacion: "media",
+            estado: "disponible",
+            fechaIngreso: new Date().toISOString().slice(0, 10),
+            disponibilidad: "por_pieza",
+            esSuelta: false,
+            cantidad: 1
+          }]);
+        }
+      },
+      className: "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition " + (checked[item] ? "bg-emerald-900/40 border border-emerald-700 text-emerald-300" : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-amber-500")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "shrink-0"
+    }, checked[item] ? "✓" : "○"), /*#__PURE__*/React.createElement("span", null, item)))), /*#__PURE__*/React.createElement(Inp, {
+      label: "Precio de " + activeCat + " completo $",
+      type: "number",
+      value: String(checklist?.precioBase || ""),
+      onChange: e => setPiezas(p => p.map(x => x.sistema === activeCat && x.esChecklist ? {
+        ...x,
+        precioBase: Number(e.target.value),
+        precioMinimo: Math.round(Number(e.target.value) * 0.7)
+      } : x)),
+      placeholder: "Precio del sistema completo"
+    }), !checklist && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-600 text-center"
+    }, "Toca las piezas que incluye el sistema"));
+  })(), getCatModo(activeCat) === "piezas" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-2 mb-4"
   }, CATS[activeCat].map(nombre => {
     const added = isAdded(activeCat, nombre);
@@ -995,9 +1059,9 @@ function RegistroPiezas({
   }, fmt(adj(p.precioBase, p.condicion))), /*#__PURE__*/React.createElement("button", {
     onClick: () => handleChip(activeCat, p.nombre),
     className: "text-xs text-zinc-500 hover:text-amber-400"
-  }, "editar"))))), catPiezas.length === 0 && !activeForm && /*#__PURE__*/React.createElement("p", {
+  }, "editar"))))), catPiezas.filter(p => !p.esChecklist).length === 0 && !activeForm && /*#__PURE__*/React.createElement("p", {
     className: "text-center text-zinc-700 text-sm py-4"
-  }, "Selecciona piezas de arriba para agregarlas")), total > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "Selecciona piezas de arriba para agregarlas"))), total > 0 && /*#__PURE__*/React.createElement("div", {
     className: "mt-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-bold text-amber-400 mb-2"
@@ -1046,13 +1110,11 @@ function FichaCamion({
     className: "text-right"
   }, /*#__PURE__*/React.createElement(Badge, {
     color: truck.tipoVenta === "completo" ? "purple" : truck.tipoVenta === "mixto" ? "amber" : "green"
-  }, TIPO_VENTA[truck.tipoVenta] || truck.tipoVenta), vend > 0 && /*#__PURE__*/React.createElement(Badge, {
-    color: "gray"
-  }, vend, " vendidas")), t.ubicacion && /*#__PURE__*/React.createElement("p", {
+  }, TIPO_VENTA[truck.tipoVenta] || truck.tipoVenta)), truck.ubicacion && /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-amber-400/80 mb-2"
-  }, "📍 Seccion ", t.ubicacion.seccion), t.tipoVenta !== "por_piezas" && t.precioVenta && /*#__PURE__*/React.createElement("p", {
+  }, "📍 Seccion ", truck.ubicacion.seccion), truck.tipoVenta !== "por_piezas" && truck.precioVenta && /*#__PURE__*/React.createElement("p", {
     className: "text-lg font-black text-amber-400"
-  }, fmt(t.precioVenta))), /*#__PURE__*/React.createElement("div", {
+  }, fmt(truck.precioVenta))), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-3 gap-3 text-center mb-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-zinc-800 rounded-lg p-3"
@@ -1415,9 +1477,7 @@ function Login({
     full: true,
     onClick: attempt,
     disabled: !sel || !pin
-  }, "Entrar"), /*#__PURE__*/React.createElement("p", {
-    className: "text-zinc-700 text-xs text-center"
-  }, "Admin 1234 · Carlos 2222 · Luis 3333"))));
+  }, "Entrar"))));
 }
 function Dashboard({
   trucks,
@@ -1597,7 +1657,9 @@ function Camiones({
       id: uid("T"),
       costoCompra: Number(form.costoCompra),
       precioVenta: form.precioVenta ? Number(form.precioVenta) : null,
-      anio: Number(form.anio)
+      anio: Number(form.anio),
+      creadoPor: user?.nombre || "Admin",
+      fechaRegistro: new Date().toISOString().slice(0, 10)
     };
     setTrucks(p => [...p, t]);
     setModal(false);
@@ -1617,6 +1679,7 @@ function Camiones({
     return /*#__PURE__*/React.createElement(RegistroPiezas, {
       truck: activeTruck,
       existingParts: existing,
+      user: user,
       onSave: p => {
         handleSaveParts(activeTruck.id, p);
         setVista({
@@ -1675,7 +1738,7 @@ function Camiones({
       className: "font-black text-zinc-100"
     }, t.nombre), /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-500"
-    }, t.id, " · ", t.fechaEntrada)), t.tipoVenta !== "por_piezas" && t.precioVenta ? /*#__PURE__*/React.createElement("p", {
+    }, t.id, " · ", t.fechaEntrada, t.creadoPor ? " · Reg. por " + t.creadoPor : "")), t.tipoVenta !== "por_piezas" && t.precioVenta ? /*#__PURE__*/React.createElement("p", {
       className: "text-lg font-black text-amber-400"
     }, fmt(t.precioVenta)) : /*#__PURE__*/React.createElement(Badge, {
       color: "gray"
@@ -1753,7 +1816,7 @@ function Camiones({
       costoCompra: e.target.value
     }))
   })), /*#__PURE__*/React.createElement(Sel, {
-    label: "Tipo de venta",
+    label: "Tipo de venta general",
     value: form.tipoVenta,
     onChange: e => setForm(f => ({
       ...f,
@@ -1765,8 +1828,8 @@ function Camiones({
     value: "completo"
   }, "Completo"), /*#__PURE__*/React.createElement("option", {
     value: "mixto"
-  }, "Mixto")), (form.tipoVenta === "completo" || form.tipoVenta === "mixto") && /*#__PURE__*/React.createElement(Inp, {
-    label: "Precio de venta $",
+  }, "Mixto — definir por sistema")), (form.tipoVenta === "completo" || form.tipoVenta === "mixto") && /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio de venta completo $",
     type: "number",
     value: form.precioVenta,
     onChange: e => setForm(f => ({
@@ -1824,7 +1887,8 @@ function Camiones({
 function Inventario({
   parts,
   setParts,
-  trucks
+  trucks,
+  user
 }) {
   const [fCamion, setFCamion] = useState("all");
   const [fCat, setFCat] = useState("all");
@@ -1833,6 +1897,8 @@ function Inventario({
   const [search, setSearch] = useState("");
   const [modalSuelta, setModalSuelta] = useState(false);
   const [editSuelta, setEditSuelta] = useState(null);
+  const [editPart, setEditPart] = useState(null);
+  const [editForm, setEditForm] = useState(null);
   const blankS = {
     sistema: Object.keys(CATS)[0],
     nombre: "",
@@ -1891,11 +1957,25 @@ function Inventario({
       precioMinimo: Number(formS.precioMinimo) || Math.round(base * 0.7),
       modelo: medida,
       esSuelta: true,
-      cantidad: Number(formS.cantidad) || 1
+      cantidad: Number(formS.cantidad) || 1,
+      creadoPor: user?.nombre || "Admin"
     };
     setParts(prev => [...prev, p]);
     setModalSuelta(false);
     setFormS(blankS);
+  }
+  function saveEditPart() {
+    if (!editForm || !editForm.precioBase) return;
+    const base = Number(editForm.precioBase);
+    setParts(p => p.map(x => x.id === editPart.id ? {
+      ...x,
+      ...editForm,
+      precioBase: base,
+      precioMinimo: Number(editForm.precioMinimo) || Math.round(base * 0.7),
+      cantidad: Number(editForm.cantidad) || 1
+    } : x));
+    setEditPart(null);
+    setEditForm(null);
   }
   function saveEditSuelta() {
     const nombreFinal = formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
@@ -2022,7 +2102,11 @@ function Inventario({
       color: "purple"
     }, "Solo completo")), /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-500 mb-1"
-    }, p.esSuelta ? "Pieza suelta" : truck ? truck.nombre : p.camionId, " · ", p.sistema), (p.marca || p.modelo) && /*#__PURE__*/React.createElement("p", {
+    }, p.esSuelta ? "Pieza suelta" : truck ? truck.nombre : p.camionId, " · ", p.sistema), p.creadoPor && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-zinc-600 mb-1"
+    }, "Registrado por: ", /*#__PURE__*/React.createElement("span", {
+      className: "text-zinc-400"
+    }, p.creadoPor), " · ", p.fechaIngreso), (p.marca || p.modelo) && /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-400 mb-1"
     }, p.marca, p.modelo ? " · " + p.modelo : ""), p.libraje && /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-400 mb-1"
@@ -2044,20 +2128,19 @@ function Inventario({
       className: "text-xs text-zinc-500"
     }, "Base: ", fmt(p.precioBase)), /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-red-400/80"
-    }, "Min: ", fmt(p.precioMinimo)))), p.esSuelta && p.estado === "disponible" && /*#__PURE__*/React.createElement("div", {
+    }, "Min: ", fmt(p.precioMinimo)))), p.estado === "disponible" && /*#__PURE__*/React.createElement("div", {
       className: "flex gap-2 mt-3 pt-3 border-t border-zinc-800",
       onClick: e => e.stopPropagation()
     }, /*#__PURE__*/React.createElement(Btn, {
       size: "sm",
       variant: "ghost",
       onClick: () => {
-        setEditSuelta(p);
-        setFormS({
+        setEditPart(p);
+        setEditForm({
           ...p,
           precioBase: String(p.precioBase),
           precioMinimo: String(p.precioMinimo),
-          cantidad: String(p.cantidad || 1),
-          nombreCustom: ""
+          cantidad: String(p.cantidad || 1)
         });
       }
     }, "Editar"), /*#__PURE__*/React.createElement(Btn, {
@@ -2068,7 +2151,140 @@ function Inventario({
         setParts(prev => prev.filter(x => x.id !== p.id));
       }
     }, "Eliminar")));
-  })), editSuelta && /*#__PURE__*/React.createElement(Modal, {
+  })), editPart && editForm && /*#__PURE__*/React.createElement(Modal, {
+    title: "Editar: " + editPart.nombre,
+    onClose: () => {
+      setEditPart(null);
+      setEditForm(null);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre",
+    value: editForm.nombre || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: editForm.marca || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Modelo/Medida",
+    value: editForm.modelo || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      modelo: e.target.value
+    }))
+  })), editForm.libraje !== undefined && /*#__PURE__*/React.createElement(Inp, {
+    label: "Libraje",
+    value: editForm.libraje || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      libraje: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-3"
+  }, /*#__PURE__*/React.createElement(CondSel, {
+    value: editForm.condicion || "B",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: editForm.precioBase || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Minimo $",
+    type: "number",
+    value: editForm.precioMinimo || "",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      precioMinimo: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Rotacion",
+    value: editForm.rotacion || "media",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      rotacion: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "rapida"
+  }, "Rapida"), /*#__PURE__*/React.createElement("option", {
+    value: "media"
+  }, "Media"), /*#__PURE__*/React.createElement("option", {
+    value: "lenta"
+  }, "Lenta")), /*#__PURE__*/React.createElement(Inp, {
+    label: "Cantidad",
+    type: "number",
+    value: editForm.cantidad || 1,
+    min: "1",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      cantidad: Number(e.target.value)
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditForm(f => ({
+      ...f,
+      _showMapa: true
+    })),
+    className: "text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg transition font-bold"
+  }, editForm.ubicacion ? "📍 Seccion " + editForm.ubicacion.seccion : "📍 Ubicacion"), editForm.ubicacion && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditForm(f => ({
+      ...f,
+      ubicacion: null
+    })),
+    className: "text-xs text-red-400"
+  }, "Quitar")), editForm._showMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+    value: editForm.ubicacion,
+    onChange: v => setEditForm(f => ({
+      ...f,
+      ubicacion: v,
+      _showMapa: false
+    })),
+    onClose: () => setEditForm(f => ({
+      ...f,
+      _showMapa: false
+    }))
+  }), /*#__PURE__*/React.createElement(Sel, {
+    label: "Disponibilidad",
+    value: editForm.disponibilidad || "por_pieza",
+    onChange: e => setEditForm(f => ({
+      ...f,
+      disponibilidad: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "por_pieza"
+  }, "Por pieza"), /*#__PURE__*/React.createElement("option", {
+    value: "con_camion_completo"
+  }, "Solo con camion completo")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: saveEditPart,
+    disabled: !editForm.precioBase
+  }, "Guardar cambios"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      setEditPart(null);
+      setEditForm(null);
+    }
+  }, "Cancelar")))), editSuelta && /*#__PURE__*/React.createElement(Modal, {
     title: "Editar: " + editSuelta.nombre,
     onClose: () => {
       setEditSuelta(null);
@@ -2390,8 +2606,19 @@ function Ventas({
     canal: "Mostrador",
     fecha: new Date().toISOString().slice(0, 10)
   };
+  const blankNueva = {
+    sistema: Object.keys(CATS)[0],
+    nombre: "",
+    marca: "",
+    modelo: "",
+    condicion: "B",
+    precioBase: "",
+    camionId: ""
+  };
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(blank);
+  const [ventaNueva, setVentaNueva] = useState(false);
+  const [formNueva, setFormNueva] = useState(blankNueva);
   const [warn, setWarn] = useState("");
   const [descWarn, setDescWarn] = useState("");
   const disponibles = parts.filter(p => p.estado === "disponible");
@@ -2483,7 +2710,15 @@ function Ventas({
     onClose: () => setModal(false)
   }, /*#__PURE__*/React.createElement("div", {
     className: "space-y-3"
-  }, /*#__PURE__*/React.createElement(Sel, {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 mb-1"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setVentaNueva(false),
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (!ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "Pieza registrada"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setVentaNueva(true),
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "Pieza nueva")), !ventaNueva && /*#__PURE__*/React.createElement(Sel, {
     label: "Pieza *",
     value: form.piezaId,
     onChange: e => setForm(f => ({
@@ -2499,7 +2734,66 @@ function Ventas({
       key: p.id,
       value: p.id
     }, p.nombre, p.marca ? " — " + p.marca : "", " (", t ? t.nombre : "Suelta", ") ", fmt(adj(p.precioBase, p.condicion)));
-  })), selPart && /*#__PURE__*/React.createElement("div", {
+  })), ventaNueva && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 bg-zinc-800 rounded-xl p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-amber-400 uppercase"
+  }, "Registrar pieza al momento"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Categoria",
+    value: formNueva.sistema,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      sistema: e.target.value
+    }))
+  }, Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Nombre *",
+    value: formNueva.nombre,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      nombre: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Marca",
+    value: formNueva.marca,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      marca: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(CondSel, {
+    value: formNueva.condicion,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      condicion: e.target.value
+    }))
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio base $",
+    type: "number",
+    value: formNueva.precioBase,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      precioBase: e.target.value
+    }))
+  }), /*#__PURE__*/React.createElement(Sel, {
+    label: "Camion (opcional)",
+    value: formNueva.camionId,
+    onChange: e => setFormNueva(f => ({
+      ...f,
+      camionId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Pieza suelta"), trucks.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.id,
+    value: t.id
+  }, t.nombre))))), selPart && /*#__PURE__*/React.createElement("div", {
     className: "bg-zinc-800 rounded-lg p-3 text-xs space-y-1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between"
@@ -2584,7 +2878,7 @@ function Ventas({
     className: "flex gap-2 pt-2"
   }, /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
-    disabled: !form.piezaId || !form.precioFinal || !!descWarn
+    disabled: ventaNueva ? !formNueva.nombre || !formNueva.precioBase || !form.precioFinal : !form.piezaId || !form.precioFinal || !!descWarn
   }, "Registrar"), /*#__PURE__*/React.createElement(Btn, {
     variant: "ghost",
     onClick: () => setModal(false)
@@ -3440,7 +3734,8 @@ function App() {
   }), view === "inventario" && /*#__PURE__*/React.createElement(Inventario, {
     parts: parts,
     setParts: setParts,
-    trucks: trucks
+    trucks: trucks,
+    user: user
   }), view === "unidades" && /*#__PURE__*/React.createElement(UnidadesCompletas, {
     parts: parts,
     setParts: setParts,
