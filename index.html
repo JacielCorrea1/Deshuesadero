@@ -21,36 +21,36 @@
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
+
+  let fbWriting = false; // evita bucle: Firebase->App->Firebase
+
   async function saveToFirebase(col, data) {
+    if(fbWriting) return; // si el cambio vino de Firebase, no reescribir
     try {
       const batch = db.batch();
       const existing = await db.collection(col).get();
       existing.docs.forEach(d => batch.delete(d.ref));
       data.forEach(item => {
-        const ref = db.collection(col).doc(item.id || db.collection(col).doc().id);
+        const ref = db.collection(col).doc(String(item.id));
         batch.set(ref, item);
       });
       await batch.commit();
-    } catch(e) { console.error("Firebase error:", col, e); }
+    } catch(e) { console.error("Firebase save error:", col, e); }
   }
-  async function loadFromFirebase(col, seed, setter) {
-    try {
-      const snap = await db.collection(col).get();
+
+  function listenCollection(col, setter) {
+    return db.collection(col).onSnapshot(snap => {
       if (!snap.empty) {
-        setter(snap.docs.map(d => ({...d.data(), id: d.id})));
-      } else {
-        const local = localStorage.getItem(col);
-        const data = local ? JSON.parse(local) : seed;
+        fbWriting = true; // marcar que el cambio viene de Firebase
+        const data = snap.docs.map(d => ({...d.data(), id: d.id}));
         setter(data);
-        if (data && data.length > 0) await saveToFirebase(col, data);
+        localStorage.setItem(col, JSON.stringify(data));
+        setTimeout(() => fbWriting = false, 500); // reset despues de que React procese
       }
-    } catch(e) {
-      const local = localStorage.getItem(col);
-      if (local) setter(JSON.parse(local));
-      else setter(seed);
-    }
+    }, err => console.error("Firebase listen error:", col, err));
   }
-  window.dbHelpers = { saveToFirebase, loadFromFirebase };
+
+  window.dbHelpers = { saveToFirebase, listenCollection };
 </script>
 </head>
 <body>
@@ -3673,6 +3673,19 @@ function App() {
   const [sales, setSales] = useState(() => loadData("sales") ?? SEED_SALES);
   const [user, setUser] = useState(null);
   const [view, setView] = useState("dashboard");
+  // Listeners en tiempo real de Firebase
+  useEffect(() => {
+    if(!window.dbHelpers) return;
+    const unsubs = [
+      window.dbHelpers.listenCollection("sellers", setSellers),
+      window.dbHelpers.listenCollection("clients", setClients),
+      window.dbHelpers.listenCollection("trucks", setTrucks),
+      window.dbHelpers.listenCollection("parts", setParts),
+      window.dbHelpers.listenCollection("sales", setSales),
+    ];
+    return () => unsubs.forEach(u => u && u());
+  }, []);
+
   useEffect(() => {
     saveData("sellers", sellers);
     if(window.dbHelpers) window.dbHelpers.saveToFirebase("sellers", sellers);
