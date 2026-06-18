@@ -11,56 +11,26 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBqsyvnlW2aDA7K3WLAPfG8vFdgdEGBNuo",
-    authDomain: "deshuesadero-a1b1a.firebaseapp.com",
-    projectId: "deshuesadero-a1b1a",
-    storageBucket: "deshuesadero-a1b1a.firebasestorage.app",
-    messagingSenderId: "104785281129",
-    appId: "1:104785281129:web:9cb4c80e03ce54c94162f8"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-  let fbWriting = false;
-
-  async function saveToFirebase(col, data) {
-    if(fbWriting) return;
-    try {
-      const batch = db.batch();
-      const existing = await db.collection(col).get();
-      existing.docs.forEach(d => batch.delete(d.ref));
-      data.forEach(item => {
-        const ref = db.collection(col).doc(String(item.id));
-        batch.set(ref, item);
-      });
-      await batch.commit();
-    } catch(e) { console.error("Firebase save error:", col, e); }
-  }
-
-  async function deleteFromFirebase(col, id) {
-    try {
-      await db.collection(col).doc(String(id)).delete();
-    } catch(e) { console.error("Firebase delete error:", col, id, e); }
-  }
-
-  function listenCollection(col, setter) {
-    return db.collection(col).onSnapshot(snap => {
-      if (!snap.empty) {
-        fbWriting = true;
-        const data = snap.docs.map(d => ({...d.data(), id: d.id}));
-        setter(data);
-        localStorage.setItem(col, JSON.stringify(data));
-        setTimeout(() => fbWriting = false, 500);
-      }
-    }, err => console.error("Firebase listen error:", col, err));
-  }
-
-  window.dbHelpers = { saveToFirebase, deleteFromFirebase, listenCollection };
+  const firebaseConfig={apiKey:"AIzaSyBqsyvnlW2aDA7K3WLAPfG8vFdgdEGBNuo",authDomain:"deshuesadero-a1b1a.firebaseapp.com",projectId:"deshuesadero-a1b1a",storageBucket:"deshuesadero-a1b1a.firebasestorage.app",messagingSenderId:"104785281129",appId:"1:104785281129:web:9cb4c80e03ce54c94162f8"};
+  firebase.initializeApp(firebaseConfig);const db=firebase.firestore();
+  let fbWriting=false;let fbLoadedCount=0;
+  async function saveToFirebase(col,data){if(fbWriting||fbLoadedCount<5)return;try{const batch=db.batch();const ex=await db.collection(col).get();ex.docs.forEach(d=>batch.delete(d.ref));data.forEach(item=>{batch.set(db.collection(col).doc(String(item.id)),item);});await batch.commit();}catch(e){console.error("FB save:",col,e);}}
+  async function deleteFromFirebase(col,id){try{await db.collection(col).doc(String(id)).delete();}catch(e){console.error("FB delete:",e);}}
+  function listenCollection(col,setter){let first=true;return db.collection(col).onSnapshot(snap=>{fbWriting=true;if(!snap.empty){const data=snap.docs.map(d=>({...d.data(),id:d.id}));setter(data);localStorage.setItem(col,JSON.stringify(data));}if(first){first=false;fbLoadedCount++;}setTimeout(()=>fbWriting=false,500);},err=>console.error("FB listen:",col,err));}
+  window.dbHelpers={saveToFirebase,deleteFromFirebase,listenCollection};
 </script>
 </head>
 <body>
 <div id="root"></div>
 <script>
+
+
+
+
+
+
+
+
 const {
   useState,
   useEffect,
@@ -663,7 +633,16 @@ function FormPieza({
     onChange: e => setForm(f => ({
       ...f,
       nombre: e.target.value
-    }))
+    })),
+    placeholder: "Ej: Kenworth T800 2018"
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Folio",
+    value: form.folio || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      folio: e.target.value
+    })),
+    placeholder: "Ej: F-001"
   }), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-2 gap-3"
   }, cfg.marcaOpts ? /*#__PURE__*/React.createElement(Sel, {
@@ -1135,16 +1114,41 @@ function FichaCamion({
   truck,
   parts,
   onBack,
-  onEditPiezas
+  onEditPiezas,
+  onSaveTruck
 }) {
   const [openCat, setOpenCat] = useState(null);
+  const [showEditTruck, setShowEditTruck] = useState(false);
+  const [editTruckForm, setEditTruckForm] = useState({...truck});
   const tParts = parts.filter(p => p.camionId === truck.id);
   const disp = tParts.filter(p => p.estado === "disponible");
   const vendidas = tParts.filter(p => p.estado === "vendida");
   const totalValor = disp.reduce((a, p) => a + adj(p.precioBase, p.condicion), 0);
   return /*#__PURE__*/React.createElement("div", {
     className: "space-y-4"
-  }, /*#__PURE__*/React.createElement("button", {
+  },
+  showEditTruck && /*#__PURE__*/React.createElement(Modal, {
+    title: "Editar camion: " + truck.nombre,
+    onClose: () => setShowEditTruck(false)
+  }, /*#__PURE__*/React.createElement("div", {className: "space-y-3"},
+    /*#__PURE__*/React.createElement("div", {className: "grid grid-cols-2 gap-3"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Nombre", value:editTruckForm.nombre||"", onChange:e=>setEditTruckForm(f=>({...f,nombre:e.target.value}))}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Folio", value:editTruckForm.folio||"", onChange:e=>setEditTruckForm(f=>({...f,folio:e.target.value}))})
+    ),
+    /*#__PURE__*/React.createElement("div", {className: "grid grid-cols-3 gap-3"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Marca", value:editTruckForm.marca||"", onChange:e=>setEditTruckForm(f=>({...f,marca:e.target.value}))}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Modelo", value:editTruckForm.modelo||"", onChange:e=>setEditTruckForm(f=>({...f,modelo:e.target.value}))}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Anio", type:"number", value:editTruckForm.anio||"", onChange:e=>setEditTruckForm(f=>({...f,anio:e.target.value}))})
+    ),
+    /*#__PURE__*/React.createElement(Inp, {label:"Remolque", value:editTruckForm.remolque||"", onChange:e=>setEditTruckForm(f=>({...f,remolque:e.target.value})), placeholder:"Ej: Remolque Randon 2020"}),
+    /*#__PURE__*/React.createElement(Inp, {label:"No. Serie Chasis", value:editTruckForm.serieChasis||"", onChange:e=>setEditTruckForm(f=>({...f,serieChasis:e.target.value}))}),
+    /*#__PURE__*/React.createElement(Txta, {label:"Notas", value:editTruckForm.notas||"", onChange:e=>setEditTruckForm(f=>({...f,notas:e.target.value}))}),
+    /*#__PURE__*/React.createElement("div", {className:"flex gap-2 pt-2"},
+      /*#__PURE__*/React.createElement(Btn, {onClick:()=>{if(onSaveTruck)onSaveTruck(editTruckForm);setShowEditTruck(false);}}, "Guardar"),
+      /*#__PURE__*/React.createElement(Btn, {variant:"ghost", onClick:()=>setShowEditTruck(false)}, "Cancelar")
+    )
+  )),
+  /*#__PURE__*/React.createElement("button", {
     onClick: onBack,
     className: "text-zinc-400 hover:text-amber-400 text-sm font-bold"
   }, "← Camiones"), /*#__PURE__*/React.createElement("div", {
@@ -1185,10 +1189,9 @@ function FichaCamion({
     className: "text-lg font-black text-emerald-400"
   }, vendidas.length), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-zinc-500"
-  }, "Vendidas"))), /*#__PURE__*/React.createElement(Btn, {
-    onClick: onEditPiezas,
-    variant: "ghost"
-  }, "Editar piezas")), /*#__PURE__*/React.createElement("div", {
+  }, "Vendidas"))), /*#__PURE__*/React.createElement("div", {className:"flex gap-2"},
+    /*#__PURE__*/React.createElement(Btn, {onClick: onEditPiezas, variant: "ghost"}, "Editar piezas"),
+    /*#__PURE__*/React.createElement(Btn, {onClick: () => setShowEditTruck(true), variant: "ghost"}, "Editar camion"))), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2"
   }, Object.keys(CATS).map(cat => {
     const catDisp = disp.filter(p => p.sistema === cat);
@@ -1541,7 +1544,7 @@ function Dashboard({
 }) {
   const fileRef = useRef(null);
   const [msg, setMsg] = useState("");
-  const totalRec = sales.reduce((s, v) => s + v.precioFinal, 0);
+  const totalRec = sales.filter(v => !v.devolucion).reduce((s, v) => s + v.precioFinal, 0);
   const disponibles = parts.filter(p => p.estado === "disponible").length;
   const nuevas = parts.filter(p => p.condicion === "N" && p.estado === "disponible").length;
   const lentas = parts.filter(p => p.estado === "disponible" && p.rotacion === "lenta").length;
@@ -1688,6 +1691,7 @@ function Camiones({
   const [vista, setVista] = useState(null);
   const [modal, setModal] = useState(false);
   const blank = {
+    folio: "",
     nombre: "",
     marca: "",
     modelo: "",
@@ -1696,11 +1700,20 @@ function Camiones({
     precioVenta: "",
     fechaEntrada: new Date().toISOString().slice(0, 10),
     notas: "",
-    tipoVenta: "por_piezas"
+    tipoVenta: "por_piezas",
+    folio: "",
+    serieChasis: ""
   };
   const [form, setForm] = useState(blank);
   const [pendingTruck, setPendingTruck] = useState(null);
   const [showTruckMapa, setShowTruckMapa] = useState(false);
+  const [editTruck, setEditTruck] = useState(null);
+  const [editTruckForm, setEditTruckForm] = useState(null);
+  function saveTruckEdit() {
+    if (!editTruckForm || !editTruckForm.nombre) return;
+    setTrucks(p => p.map(t => t.id === editTruck.id ? _objectSpread(_objectSpread({}, editTruckForm), {}, {id: editTruck.id, costoCompra: Number(editTruckForm.costoCompra), precioVenta: editTruckForm.precioVenta ? Number(editTruckForm.precioVenta) : null, anio: Number(editTruckForm.anio)}) : t));
+    setEditTruck(null); setEditTruckForm(null);
+  }
   function saveTruck() {
     if (!form.nombre || !form.costoCompra) return;
     const t = {
@@ -1750,6 +1763,7 @@ function Camiones({
       truck: activeTruck,
       parts: parts,
       onBack: () => setVista(null),
+      onSaveTruck: t => setTrucks(p => p.map(x => x.id === t.id ? t : x)),
       onEditPiezas: () => setVista({
         tipo: "piezas",
         truckId: activeTruck.id
@@ -1789,7 +1803,7 @@ function Camiones({
       className: "font-black text-zinc-100"
     }, t.nombre), /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-500"
-    }, t.id, " · ", t.fechaEntrada, t.creadoPor ? " · Reg. por " + t.creadoPor : "")), t.tipoVenta !== "por_piezas" && t.precioVenta ? /*#__PURE__*/React.createElement("p", {
+    }, t.folio ? "Folio: " + t.folio + " | " : "", t.id, t.folio ? t.folio + " · " : "", t.fechaEntrada, t.creadoPor ? " · Reg. por " + t.creadoPor : "")), t.tipoVenta !== "por_piezas" && t.precioVenta ? /*#__PURE__*/React.createElement("p", {
       className: "text-lg font-black text-amber-400"
     }, fmt(t.precioVenta)) : /*#__PURE__*/React.createElement(Badge, {
       color: "gray"
@@ -1826,6 +1840,11 @@ function Camiones({
   }, /*#__PURE__*/React.createElement("div", {
     className: "space-y-3"
   }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Folio / No. Unidad",
+    value: form.folio || "",
+    onChange: e => setForm(f => ({...f, folio: e.target.value})),
+    placeholder: "Ej: 001, KW-2018"
+  }), /*#__PURE__*/React.createElement(Inp, {
     label: "Nombre *",
     value: form.nombre,
     onChange: e => setForm(f => ({
@@ -1849,7 +1868,12 @@ function Camiones({
       ...f,
       modelo: e.target.value
     }))
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(Inp, {
+    label: "No. Serie Chasis",
+    value: form.serieChasis || "",
+    onChange: e => setForm(f => ({...f, serieChasis: e.target.value})),
+    placeholder: "Ej: 3AKJGLD55FSFJ1234"
+  }), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-2 gap-3"
   }, /*#__PURE__*/React.createElement(Inp, {
     label: "Anio",
@@ -1924,7 +1948,36 @@ function Camiones({
   }, "Guardar y agregar piezas"), /*#__PURE__*/React.createElement(Btn, {
     variant: "ghost",
     onClick: () => setModal(false)
-  }, "Cancelar")))), showTruckMapa && /*#__PURE__*/React.createElement(MapaSelector, {
+  }, "Cancelar")))), editTruck && editTruckForm && /*#__PURE__*/React.createElement(Modal, {
+    title: "Editar: " + editTruck.nombre,
+    onClose: () => { setEditTruck(null); setEditTruckForm(null); }
+  }, /*#__PURE__*/React.createElement("div", {className: "space-y-3"},
+    /*#__PURE__*/React.createElement(Inp, {label: "Folio", value: editTruckForm.folio||"", onChange: e=>setEditTruckForm(f=>({...f,folio:e.target.value}))}),
+    /*#__PURE__*/React.createElement(Inp, {label: "Nombre *", value: editTruckForm.nombre||"", onChange: e=>setEditTruckForm(f=>({...f,nombre:e.target.value}))}),
+    /*#__PURE__*/React.createElement("div", {className:"grid grid-cols-2 gap-3"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Marca", value:editTruckForm.marca||"", onChange:e=>setEditTruckForm(f=>({...f,marca:e.target.value}))}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Modelo", value:editTruckForm.modelo||"", onChange:e=>setEditTruckForm(f=>({...f,modelo:e.target.value}))})
+    ),
+    /*#__PURE__*/React.createElement("div", {className:"grid grid-cols-2 gap-3"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Anio", type:"number", value:editTruckForm.anio||"", onChange:e=>setEditTruckForm(f=>({...f,anio:e.target.value}))}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Costo compra $", type:"number", value:editTruckForm.costoCompra||"", onChange:e=>setEditTruckForm(f=>({...f,costoCompra:e.target.value}))})
+    ),
+    /*#__PURE__*/React.createElement(Sel, {label:"Tipo de venta", value:editTruckForm.tipoVenta||"por_piezas", onChange:e=>setEditTruckForm(f=>({...f,tipoVenta:e.target.value}))},
+      /*#__PURE__*/React.createElement("option",{value:"por_piezas"},"Por piezas"),
+      /*#__PURE__*/React.createElement("option",{value:"completo"},"Completo"),
+      /*#__PURE__*/React.createElement("option",{value:"mixto"},"Mixto")
+    ),
+    (editTruckForm.tipoVenta==="completo"||editTruckForm.tipoVenta==="mixto") && /*#__PURE__*/React.createElement(Inp, {label:"Precio venta $", type:"number", value:editTruckForm.precioVenta||"", onChange:e=>setEditTruckForm(f=>({...f,precioVenta:e.target.value}))}),
+    /*#__PURE__*/React.createElement(Inp, {label:"Remolque", value:editTruckForm.remolque||"", onChange:e=>setEditTruckForm(f=>({...f,remolque:e.target.value})), placeholder:"Ej: Remolque Randon 2020"}),
+    /*#__PURE__*/React.createElement(Inp, {label:"No. Serie Chasis", value:editTruckForm.serieChasis||"", onChange:e=>setEditTruckForm(f=>({...f,serieChasis:e.target.value}))}),
+    /*#__PURE__*/React.createElement(Txta, {label:"Notas", value:editTruckForm.notas||"", onChange:e=>setEditTruckForm(f=>({...f,notas:e.target.value}))}),
+    /*#__PURE__*/React.createElement(Inp, {label:"Fecha entrada", type:"date", value:editTruckForm.fechaEntrada||"", onChange:e=>setEditTruckForm(f=>({...f,fechaEntrada:e.target.value}))}),
+    /*#__PURE__*/React.createElement("div", {className:"flex gap-2 pt-2"},
+      /*#__PURE__*/React.createElement(Btn, {onClick: saveTruckEdit, disabled: !editTruckForm.nombre}, "Guardar cambios"),
+      /*#__PURE__*/React.createElement(Btn, {variant:"ghost", onClick:()=>{setEditTruck(null);setEditTruckForm(null);}}, "Cancelar")
+    )
+  )),
+  showTruckMapa && /*#__PURE__*/React.createElement(MapaSelector, {
     value: form.ubicacion,
     onChange: v => {
       setForm(f => ({
@@ -1940,7 +1993,8 @@ function Inventario({
   parts,
   setParts,
   trucks,
-  user
+  user,
+  onSelectPart
 }) {
   const [fCamion, setFCamion] = useState("all");
   const [fCat, setFCat] = useState("all");
@@ -1993,7 +2047,9 @@ function Inventario({
     }));
   }
   function saveSuelta() {
-    const nombreFinal = formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
+    const nombreFinal = formS.sistema === "Remolque"
+    ? ("Remolque " + (formS.marca||"") + (formS.modelo ? " " + formS.modelo : "") + (formS.anioRemolque ? " " + formS.anioRemolque : "")).trim()
+    : formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
     if (!nombreFinal || !formS.precioBase) return;
     const base = Number(formS.precioBase);
     const cfg = PCFG[nombreFinal] || {};
@@ -2030,7 +2086,9 @@ function Inventario({
     setEditForm(null);
   }
   function saveEditSuelta() {
-    const nombreFinal = formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
+    const nombreFinal = formS.sistema === "Remolque"
+    ? ("Remolque " + (formS.marca||"") + (formS.modelo ? " " + formS.modelo : "") + (formS.anioRemolque ? " " + formS.anioRemolque : "")).trim()
+    : formS.nombre === "__custom__" ? formS.nombreCustom : formS.nombre;
     if (!nombreFinal || !formS.precioBase) return;
     const base = Number(formS.precioBase);
     const cfg = PCFG[nombreFinal] || {};
@@ -2135,7 +2193,8 @@ function Inventario({
     };
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
-      className: "bg-zinc-900 border rounded-xl p-4 transition " + (p.estado === "vendida" ? "border-zinc-800 opacity-50" : p.esSuelta ? "border-orange-800/40" : "border-zinc-800 hover:border-zinc-700")
+      className: "bg-zinc-900 border rounded-xl p-4 transition cursor-pointer " + (p.estado === "vendida" ? "border-zinc-800 opacity-50" : p.esSuelta ? "border-orange-800/40" : "border-zinc-800 hover:border-amber-700/50"),
+      onClick: () => onSelectPart && onSelectPart(p)
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex flex-wrap justify-between items-start gap-2"
     }, /*#__PURE__*/React.createElement("div", {
@@ -2166,7 +2225,9 @@ function Inventario({
       className: "text-xs text-zinc-400 mb-1"
     }, "Tipo: ", p.tipoRin), p.ubicacion && /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-amber-400/80 mb-1"
-    }, "📍 Seccion ", p.ubicacion.seccion), /*#__PURE__*/React.createElement("div", {
+    }, "📍 Seccion ", p.ubicacion.seccion), p.esDevolucion && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-red-400/80 mb-1"
+    }, "↩ Devolucion: ", p.razonDevolucion), /*#__PURE__*/React.createElement("div", {
       className: "flex gap-1.5 flex-wrap"
     }, /*#__PURE__*/React.createElement(Badge, {
       color: condColor(p.condicion)
@@ -2181,7 +2242,7 @@ function Inventario({
     }, "Base: ", fmt(p.precioBase)), /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-red-400/80"
     }, "Min: ", fmt(p.precioMinimo)))), p.estado === "disponible" && /*#__PURE__*/React.createElement("div", {
-      className: "flex gap-2 mt-3 pt-3 border-t border-zinc-800",
+      className: "flex gap-2 mt-3 pt-3 border-t border-zinc-800", onClick: e => e.stopPropagation(),
       onClick: e => e.stopPropagation()
     }, /*#__PURE__*/React.createElement(Btn, {
       size: "sm",
@@ -2236,7 +2297,7 @@ function Inventario({
     onChange: e => handleCatChange(e.target.value)
   }, Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
     key: c
-  }, c))), /*#__PURE__*/React.createElement(Inp, {
+  }, c)), /*#__PURE__*/React.createElement("option", {value:"Remolque"}, "Remolque")), /*#__PURE__*/React.createElement(Inp, {
     label: "Nombre",
     value: formS.nombre || formS.nombreCustom || "",
     onChange: e => setFormS(f => ({
@@ -2342,7 +2403,24 @@ function Inventario({
     onChange: e => handleCatChange(e.target.value)
   }, Object.keys(CATS).map(c => /*#__PURE__*/React.createElement("option", {
     key: c
-  }, c))), /*#__PURE__*/React.createElement(Sel, {
+  }, c)), /*#__PURE__*/React.createElement("option", {value:"Remolque"}, "Remolque")), formS.sistema === "Remolque" ? /*#__PURE__*/React.createElement("div", {className:"space-y-3"},
+    /*#__PURE__*/React.createElement("p", {className:"text-xs text-amber-400 font-bold uppercase"}, "🚛 Datos del Remolque"),
+    /*#__PURE__*/React.createElement("div", {className:"grid grid-cols-2 gap-2"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Marca *", value:formS.marca||"", onChange:e=>setFormS(f=>({...f,marca:e.target.value})), placeholder:"Ej: Randon"}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Modelo", value:formS.modelo||"", onChange:e=>setFormS(f=>({...f,modelo:e.target.value})), placeholder:"Ej: SR BA"})
+    ),
+    /*#__PURE__*/React.createElement("div", {className:"grid grid-cols-2 gap-2"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Año", type:"number", value:formS.anioRemolque||"", onChange:e=>setFormS(f=>({...f,anioRemolque:e.target.value})), placeholder:new Date().getFullYear().toString()}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Folio", value:formS.folioRemolque||"", onChange:e=>setFormS(f=>({...f,folioRemolque:e.target.value})), placeholder:"Ej: R-001"})
+    ),
+    /*#__PURE__*/React.createElement(Inp, {label:"No. Serie Chasis", value:formS.serieChasis||"", onChange:e=>setFormS(f=>({...f,serieChasis:e.target.value})), placeholder:"Ej: 9BM384..."}),
+    /*#__PURE__*/React.createElement(CondSel, {value:formS.condicion||"B", onChange:e=>setFormS(f=>({...f,condicion:e.target.value}))}),
+    /*#__PURE__*/React.createElement("div", {className:"grid grid-cols-2 gap-2"},
+      /*#__PURE__*/React.createElement(Inp, {label:"Precio $*", type:"number", value:formS.precioBase||"", onChange:e=>setFormS(f=>({...f,precioBase:e.target.value}))}),
+      /*#__PURE__*/React.createElement(Inp, {label:"Precio minimo $", type:"number", value:formS.precioMinimo||"", onChange:e=>setFormS(f=>({...f,precioMinimo:e.target.value}))})
+    ),
+    /*#__PURE__*/React.createElement(Inp, {label:"Notas", value:formS.notas||"", onChange:e=>setFormS(f=>({...f,notas:e.target.value}))})
+  ) : /*#__PURE__*/React.createElement(Sel, {
     label: "Pieza",
     value: formS.nombre,
     onChange: e => handleNombreChange(e.target.value)
@@ -2557,6 +2635,11 @@ function Ventas({
   const [form, setForm] = useState(blank);
   const [ventaNueva, setVentaNueva] = useState(false);
   const [formNueva, setFormNueva] = useState(blankNueva);
+  const [modalDev, setModalDev] = useState(null);
+  const [razonDev, setRazonDev] = useState("");
+  const [modoMultiple, setModoMultiple] = useState(false);
+  const [carrito, setCarrito] = useState([]);
+  const [precioFinalMultiple, setPrecioFinalMultiple] = useState("");
   const [warn, setWarn] = useState("");
   const [descWarn, setDescWarn] = useState("");
   const disponibles = parts.filter(p => p.estado === "disponible");
@@ -2569,6 +2652,66 @@ function Ventas({
     if (selPart && form.precioFinal) setWarn(finalNum < selPart.precioMinimo ? "Por debajo del minimo (" + fmt(selPart.precioMinimo) + ")" : "");else setWarn("");
     if (selPart && descNum > 0 && user.rol !== "admin" && descPct > user.maxDescuento) setDescWarn("Tu limite es " + user.maxDescuento + "%");else setDescWarn("");
   }, [form.precioFinal, form.piezaId, form.descuento]);
+  function saveMultiple() {
+    if (carrito.length === 0 || !precioFinalMultiple) return;
+    const totalBase = carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0);
+    const finalNum = Number(precioFinalMultiple);
+    const descuento = Math.max(0, totalBase - finalNum);
+    const grupoId = uid("VG");
+    const ventaGrupo = {
+      id: grupoId,
+      tipo: "multiple",
+      items: carrito.map(p => ({
+        piezaId: p.id,
+        nombrePieza: p.nombre,
+        camionId: p.camionId || null,
+        precioBase: adj(p.precioBase, p.condicion)
+      })),
+      nombrePieza: carrito.map(p => p.nombre).join(", "),
+      precioBase: totalBase,
+      precioFinal: finalNum,
+      descuento,
+      clienteId: form.clienteId || null,
+      vendedorId: user.id,
+      vendedor: user.nombre,
+      canal: form.canal,
+      fecha: form.fecha,
+      motivoDescuento: descuento > 0 ? "Precio por volumen" : ""
+    };
+    setSales(p => [...p, ventaGrupo]);
+    setParts(p => p.map(x => carrito.find(c => c.id === x.id) ? {
+      ...x,
+      estado: "vendida"
+    } : x));
+    setCarrito([]);
+    setPrecioFinalMultiple("");
+    setModal(false);
+    setForm(blank);
+    setModoMultiple(false);
+  }
+  function procesarDevolucion() {
+    if (!modalDev || !razonDev.trim()) return;
+    // Marcar venta como devolucion
+    setSales(p => p.map(v => v.id === modalDev.id ? {
+      ...v,
+      devolucion: true,
+      razonDevolucion: razonDev,
+      fechaDevolucion: new Date().toISOString().slice(0, 10)
+    } : v));
+    // Regresar pieza al inventario marcada como devolucion
+    setParts(p => p.map(x => x.id === modalDev.piezaId ? {
+      ...x,
+      estado: "disponible",
+      esDevolucion: true,
+      razonDevolucion: razonDev,
+      condicion: "C"
+    } : x));
+    if (window.dbHelpers) {
+      window.dbHelpers.deleteFromFirebase("parts", "__dummy__"); // trigger save via useEffect
+    }
+    setModalDev(null);
+    setRazonDev("");
+  }
   function save() {
     if (!form.piezaId || !form.precioFinal || descWarn) return;
     const v = {
@@ -2625,38 +2768,122 @@ function Ventas({
     const c = clients.find(x => x.id === v.clienteId);
     return /*#__PURE__*/React.createElement("div", {
       key: v.id,
-      className: "bg-zinc-900 border border-zinc-800 rounded-xl p-4"
+      className: "bg-zinc-900 border rounded-xl p-4 " + (v.devolucion ? "border-red-800/40 bg-red-900/5" : "border-zinc-800")
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex justify-between items-start flex-wrap gap-2"
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex-1 min-w-0"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 flex-wrap mb-1"
+    }, /*#__PURE__*/React.createElement("p", {
       className: "font-bold text-zinc-100"
-    }, v.nombrePieza), /*#__PURE__*/React.createElement("p", {
+    }, v.tipo === "multiple" ? "Venta multiple (" + v.items?.length + " piezas)" : v.nombrePieza), v.tipo === "multiple" && /*#__PURE__*/React.createElement(Badge, {
+      color: "blue"
+    }, "Lote"), v.devolucion && /*#__PURE__*/React.createElement(Badge, {
+      color: "red"
+    }, "Devolucion")), v.tipo === "multiple" && v.items && /*#__PURE__*/React.createElement("div", {
+      className: "space-y-0.5 mb-1"
+    }, v.items.map((it, i) => /*#__PURE__*/React.createElement("p", {
+      key: i,
+      className: "text-xs text-zinc-400"
+    }, "· ", it.nombrePieza, " — ", fmt(it.precioBase)))), /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-500"
     }, t ? t.nombre : "Pieza suelta", " · ", v.fecha, " · ", v.vendedor, " · ", v.canal), c && /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-sky-400"
     }, "👤 ", c.nombre), v.motivoDescuento && /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-zinc-400 italic"
-    }, "Desc: ", v.motivoDescuento)), /*#__PURE__*/React.createElement("div", {
-      className: "text-right"
+    }, "Desc: ", v.motivoDescuento), v.devolucion && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-red-400 mt-1"
+    }, "↩ Devuelta: ", v.razonDevolucion, " · ", v.fechaDevolucion)), /*#__PURE__*/React.createElement("div", {
+      className: "text-right shrink-0"
     }, /*#__PURE__*/React.createElement("p", {
       className: "text-lg font-black text-amber-400"
     }, fmt(v.precioFinal)), v.descuento > 0 && /*#__PURE__*/React.createElement("p", {
       className: "text-xs text-red-400"
-    }, "-", fmt(v.descuento)))));
-  })), modal && /*#__PURE__*/React.createElement(Modal, {
+    }, "-", fmt(v.descuento)), !v.devolucion && /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setModalDev(v);
+        setRazonDev("");
+      },
+      className: "text-xs border border-red-800 text-red-400 hover:bg-red-900/30 px-2 py-1 rounded-lg mt-1 transition font-bold block w-full"
+    }, "↩ Devolver"), user.rol === "admin" && !v.devolucion && /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (!confirm("Eliminar esta venta?")) return;
+        if (window.dbHelpers) window.dbHelpers.deleteFromFirebase("sales", v.id);
+        setSales(p => p.filter(x => x.id !== v.id));
+      },
+      className: "text-xs border border-zinc-700 text-zinc-500 hover:border-red-800 hover:text-red-400 px-2 py-1 rounded-lg mt-1 transition font-bold block w-full"
+    }, "Eliminar"))));
+  })), modalDev && /*#__PURE__*/React.createElement(Modal, {
+    title: "Devolucion: " + modalDev.nombrePieza,
+    onClose: () => {
+      setModalDev(null);
+      setRazonDev("");
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-red-900/20 border border-red-800/40 rounded-xl p-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-zinc-200 font-bold"
+  }, modalDev.nombrePieza), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-500"
+  }, "Vendida el ", modalDev.fecha, " · ", fmt(modalDev.precioFinal))), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-zinc-400"
+  }, "La pieza regresara al inventario marcada como devolucion en condicion C (requiere revision)."), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-xs text-zinc-400 uppercase tracking-wider"
+  }, "Razon de devolucion *"), /*#__PURE__*/React.createElement("textarea", {
+    value: razonDev,
+    onChange: e => setRazonDev(e.target.value),
+    placeholder: "Ej: La pieza no funciono, era incompatible con el modelo del cliente...",
+    className: "bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-red-500 transition resize-none h-20"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-2"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    variant: "danger",
+    onClick: procesarDevolucion,
+    disabled: !razonDev.trim()
+  }, "Confirmar devolucion"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    onClick: () => {
+      setModalDev(null);
+      setRazonDev("");
+    }
+  }, "Cancelar")))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "Registrar Venta",
-    onClose: () => setModal(false)
+    onClose: () => {
+      setModal(false);
+      setCarrito([]);
+      setPrecioFinalMultiple("");
+      setModoMultiple(false);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "space-y-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2 mb-1"
+    className: "flex gap-1 mb-1"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setVentaNueva(false),
-    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (!ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
-  }, "Pieza registrada"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setVentaNueva(true),
-    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
-  }, "Pieza nueva")), !ventaNueva && /*#__PURE__*/React.createElement(Sel, {
+    onClick: () => {
+      setModoMultiple(false);
+      setVentaNueva(false);
+      setCarrito([]);
+    },
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (!modoMultiple && !ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "1 pieza"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setModoMultiple(false);
+      setVentaNueva(true);
+      setCarrito([]);
+    },
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (!modoMultiple && ventaNueva ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "Pieza nueva"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setModoMultiple(true);
+      setVentaNueva(false);
+    },
+    className: "flex-1 py-1.5 text-xs font-bold rounded-lg border transition " + (modoMultiple ? "bg-amber-500 text-black border-amber-500" : "border-zinc-700 text-zinc-400")
+  }, "Varias piezas")), !ventaNueva && /*#__PURE__*/React.createElement(Sel, {
     label: "Pieza *",
     value: form.piezaId,
     onChange: e => setForm(f => ({
@@ -2812,14 +3039,104 @@ function Ventas({
       ...f,
       fecha: e.target.value
     }))
-  })), /*#__PURE__*/React.createElement("div", {
+  })), modoMultiple && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Agregar pieza al carrito",
+    value: "",
+    onChange: e => {
+      if (!e.target.value) return;
+      const p = disponibles.find(x => x.id === e.target.value);
+      if (p && !carrito.find(c => c.id === p.id)) setCarrito(prev => [...prev, p]);
+      e.target.value = "";
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Seleccionar pieza..."), disponibles.filter(p => !carrito.find(c => c.id === p.id)).map(p => {
+    const t = p.camionId ? trucks.find(t => t.id === p.camionId) : null;
+    return /*#__PURE__*/React.createElement("option", {
+      key: p.id,
+      value: p.id
+    }, p.nombre, p.marca ? " — " + p.marca : "", " (", t ? t.nombre : "Suelta", ") ", fmt(adj(p.precioBase, p.condicion)));
+  })), carrito.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "bg-zinc-800 rounded-xl p-3 space-y-2"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-zinc-400 uppercase"
+  }, "Carrito (", carrito.length, " piezas)"), carrito.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    className: "flex justify-between items-center"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-zinc-200"
+  }, p.nombre, p.marca ? " · " + p.marca : ""), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-400 font-bold text-sm"
+  }, fmt(adj(p.precioBase, p.condicion))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCarrito(prev => prev.filter(c => c.id !== p.id)),
+    className: "text-red-400 text-xs hover:text-red-300"
+  }, "x")))), /*#__PURE__*/React.createElement("div", {
+    className: "border-t border-zinc-700 pt-2 flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-zinc-400"
+  }, "Total individual:"), /*#__PURE__*/React.createElement("span", {
+    className: "text-zinc-200 font-bold"
+  }, fmt(carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0))))), carrito.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement(Inp, {
+    label: "Precio final acordado $",
+    type: "number",
+    value: precioFinalMultiple,
+    onChange: e => setPrecioFinalMultiple(e.target.value),
+    placeholder: "Precio total del lote"
+  }), precioFinalMultiple && Number(precioFinalMultiple) < carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0) && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-emerald-400 font-bold"
+  }, "Descuento total: ", fmt(carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0) - Number(precioFinalMultiple)))), /*#__PURE__*/React.createElement(Sel, {
+    label: "Cliente (opcional)",
+    value: form.clienteId,
+    onChange: e => setForm(f => ({
+      ...f,
+      clienteId: e.target.value
+    }))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Sin cliente"), clients.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.id
+  }, c.nombre))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement(Sel, {
+    label: "Canal",
+    value: form.canal,
+    onChange: e => setForm(f => ({
+      ...f,
+      canal: e.target.value
+    }))
+  }, CANALES.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c
+  }, c))), /*#__PURE__*/React.createElement(Inp, {
+    label: "Fecha",
+    type: "date",
+    value: form.fecha,
+    onChange: e => setForm(f => ({
+      ...f,
+      fecha: e.target.value
+    }))
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "flex gap-2 pt-2"
-  }, /*#__PURE__*/React.createElement(Btn, {
+  }, modoMultiple ? /*#__PURE__*/React.createElement(Btn, {
+    onClick: saveMultiple,
+    disabled: carrito.length === 0 || !precioFinalMultiple
+  }, "Registrar ", carrito.length, " piezas") : /*#__PURE__*/React.createElement(Btn, {
     onClick: save,
     disabled: ventaNueva ? !formNueva.nombre || !formNueva.precioBase || !form.precioFinal : !form.piezaId || !form.precioFinal || !!descWarn
   }, "Registrar"), /*#__PURE__*/React.createElement(Btn, {
     variant: "ghost",
-    onClick: () => setModal(false)
+    onClick: () => {
+      setModal(false);
+      setCarrito([]);
+      setPrecioFinalMultiple("");
+      setModoMultiple(false);
+    }
   }, "Cancelar")))));
 }
 function Clientes({
@@ -2839,6 +3156,66 @@ function Clientes({
     fechaRegistro: new Date().toISOString().slice(0, 10)
   };
   const [form, setForm] = useState(blank);
+  function saveMultiple() {
+    if (carrito.length === 0 || !precioFinalMultiple) return;
+    const totalBase = carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0);
+    const finalNum = Number(precioFinalMultiple);
+    const descuento = Math.max(0, totalBase - finalNum);
+    const grupoId = uid("VG");
+    const ventaGrupo = {
+      id: grupoId,
+      tipo: "multiple",
+      items: carrito.map(p => ({
+        piezaId: p.id,
+        nombrePieza: p.nombre,
+        camionId: p.camionId || null,
+        precioBase: adj(p.precioBase, p.condicion)
+      })),
+      nombrePieza: carrito.map(p => p.nombre).join(", "),
+      precioBase: totalBase,
+      precioFinal: finalNum,
+      descuento,
+      clienteId: form.clienteId || null,
+      vendedorId: user.id,
+      vendedor: user.nombre,
+      canal: form.canal,
+      fecha: form.fecha,
+      motivoDescuento: descuento > 0 ? "Precio por volumen" : ""
+    };
+    setSales(p => [...p, ventaGrupo]);
+    setParts(p => p.map(x => carrito.find(c => c.id === x.id) ? {
+      ...x,
+      estado: "vendida"
+    } : x));
+    setCarrito([]);
+    setPrecioFinalMultiple("");
+    setModal(false);
+    setForm(blank);
+    setModoMultiple(false);
+  }
+  function procesarDevolucion() {
+    if (!modalDev || !razonDev.trim()) return;
+    // Marcar venta como devolucion
+    setSales(p => p.map(v => v.id === modalDev.id ? {
+      ...v,
+      devolucion: true,
+      razonDevolucion: razonDev,
+      fechaDevolucion: new Date().toISOString().slice(0, 10)
+    } : v));
+    // Regresar pieza al inventario marcada como devolucion
+    setParts(p => p.map(x => x.id === modalDev.piezaId ? {
+      ...x,
+      estado: "disponible",
+      esDevolucion: true,
+      razonDevolucion: razonDev,
+      condicion: "C"
+    } : x));
+    if (window.dbHelpers) {
+      window.dbHelpers.deleteFromFirebase("parts", "__dummy__"); // trigger save via useEffect
+    }
+    setModalDev(null);
+    setRazonDev("");
+  }
   function save() {
     if (!form.nombre) return;
     setClients(p => [...p, {
@@ -2933,7 +3310,16 @@ function Clientes({
     onChange: e => setForm(f => ({
       ...f,
       nombre: e.target.value
-    }))
+    })),
+    placeholder: "Ej: Kenworth T800 2018"
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Folio",
+    value: form.folio || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      folio: e.target.value
+    })),
+    placeholder: "Ej: F-001"
   }), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-2 gap-3"
   }, /*#__PURE__*/React.createElement(Inp, {
@@ -3008,6 +3394,66 @@ function Vendedores({
     } : blank);
     setModal(true);
   }
+  function saveMultiple() {
+    if (carrito.length === 0 || !precioFinalMultiple) return;
+    const totalBase = carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0);
+    const finalNum = Number(precioFinalMultiple);
+    const descuento = Math.max(0, totalBase - finalNum);
+    const grupoId = uid("VG");
+    const ventaGrupo = {
+      id: grupoId,
+      tipo: "multiple",
+      items: carrito.map(p => ({
+        piezaId: p.id,
+        nombrePieza: p.nombre,
+        camionId: p.camionId || null,
+        precioBase: adj(p.precioBase, p.condicion)
+      })),
+      nombrePieza: carrito.map(p => p.nombre).join(", "),
+      precioBase: totalBase,
+      precioFinal: finalNum,
+      descuento,
+      clienteId: form.clienteId || null,
+      vendedorId: user.id,
+      vendedor: user.nombre,
+      canal: form.canal,
+      fecha: form.fecha,
+      motivoDescuento: descuento > 0 ? "Precio por volumen" : ""
+    };
+    setSales(p => [...p, ventaGrupo]);
+    setParts(p => p.map(x => carrito.find(c => c.id === x.id) ? {
+      ...x,
+      estado: "vendida"
+    } : x));
+    setCarrito([]);
+    setPrecioFinalMultiple("");
+    setModal(false);
+    setForm(blank);
+    setModoMultiple(false);
+  }
+  function procesarDevolucion() {
+    if (!modalDev || !razonDev.trim()) return;
+    // Marcar venta como devolucion
+    setSales(p => p.map(v => v.id === modalDev.id ? {
+      ...v,
+      devolucion: true,
+      razonDevolucion: razonDev,
+      fechaDevolucion: new Date().toISOString().slice(0, 10)
+    } : v));
+    // Regresar pieza al inventario marcada como devolucion
+    setParts(p => p.map(x => x.id === modalDev.piezaId ? {
+      ...x,
+      estado: "disponible",
+      esDevolucion: true,
+      razonDevolucion: razonDev,
+      condicion: "C"
+    } : x));
+    if (window.dbHelpers) {
+      window.dbHelpers.deleteFromFirebase("parts", "__dummy__"); // trigger save via useEffect
+    }
+    setModalDev(null);
+    setRazonDev("");
+  }
   function save() {
     if (!form.nombre || !form.pin) return;
     if (editId) setSellers(p => p.map(s => s.id === editId ? {
@@ -3068,7 +3514,16 @@ function Vendedores({
     onChange: e => setForm(f => ({
       ...f,
       nombre: e.target.value
-    }))
+    })),
+    placeholder: "Ej: Kenworth T800 2018"
+  }), /*#__PURE__*/React.createElement(Inp, {
+    label: "Folio",
+    value: form.folio || "",
+    onChange: e => setForm(f => ({
+      ...f,
+      folio: e.target.value
+    })),
+    placeholder: "Ej: F-001"
   }), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-2 gap-3"
   }, /*#__PURE__*/React.createElement(Sel, {
@@ -3124,13 +3579,13 @@ function Rentabilidad({
     className: "text-4xl mb-2"
   }, "🔒"), /*#__PURE__*/React.createElement("p", null, "Solo el Admin"));
   const totalInv = trucks.reduce((a, t) => a + t.costoCompra, 0);
-  const totalRec = sales.reduce((a, v) => a + v.precioFinal, 0);
+  const totalRec = sales.filter(v => !v.devolucion).reduce((a, v) => a + v.precioFinal, 0);
   const sueltas = parts.filter(p => p.esSuelta && p.estado === "disponible");
   const valorSueltas = sueltas.reduce((a, p) => a + adj(p.precioBase, p.condicion), 0);
   const data = trucks.map(t => {
     const tp = parts.filter(p => p.camionId === t.id);
     const ts = sales.filter(s => s.camionId === t.id);
-    const rec = ts.reduce((a, s) => a + s.precioFinal, 0);
+    const rec = ts.filter(s => !s.devolucion).reduce((a, s) => a + s.precioFinal, 0);
     const inv = tp.filter(p => p.estado === "disponible").reduce((a, p) => a + adj(p.precioBase, p.condicion), 0);
     return {
       ...t,
@@ -3278,6 +3733,66 @@ function UnidadesCompletas({
         [item]: !f.checklist[item]
       }
     }));
+  }
+  function saveMultiple() {
+    if (carrito.length === 0 || !precioFinalMultiple) return;
+    const totalBase = carrito.reduce((s, p) => s + adj(p.precioBase, p.condicion), 0);
+    const finalNum = Number(precioFinalMultiple);
+    const descuento = Math.max(0, totalBase - finalNum);
+    const grupoId = uid("VG");
+    const ventaGrupo = {
+      id: grupoId,
+      tipo: "multiple",
+      items: carrito.map(p => ({
+        piezaId: p.id,
+        nombrePieza: p.nombre,
+        camionId: p.camionId || null,
+        precioBase: adj(p.precioBase, p.condicion)
+      })),
+      nombrePieza: carrito.map(p => p.nombre).join(", "),
+      precioBase: totalBase,
+      precioFinal: finalNum,
+      descuento,
+      clienteId: form.clienteId || null,
+      vendedorId: user.id,
+      vendedor: user.nombre,
+      canal: form.canal,
+      fecha: form.fecha,
+      motivoDescuento: descuento > 0 ? "Precio por volumen" : ""
+    };
+    setSales(p => [...p, ventaGrupo]);
+    setParts(p => p.map(x => carrito.find(c => c.id === x.id) ? {
+      ...x,
+      estado: "vendida"
+    } : x));
+    setCarrito([]);
+    setPrecioFinalMultiple("");
+    setModal(false);
+    setForm(blank);
+    setModoMultiple(false);
+  }
+  function procesarDevolucion() {
+    if (!modalDev || !razonDev.trim()) return;
+    // Marcar venta como devolucion
+    setSales(p => p.map(v => v.id === modalDev.id ? {
+      ...v,
+      devolucion: true,
+      razonDevolucion: razonDev,
+      fechaDevolucion: new Date().toISOString().slice(0, 10)
+    } : v));
+    // Regresar pieza al inventario marcada como devolucion
+    setParts(p => p.map(x => x.id === modalDev.piezaId ? {
+      ...x,
+      estado: "disponible",
+      esDevolucion: true,
+      razonDevolucion: razonDev,
+      condicion: "C"
+    } : x));
+    if (window.dbHelpers) {
+      window.dbHelpers.deleteFromFirebase("parts", "__dummy__"); // trigger save via useEffect
+    }
+    setModalDev(null);
+    setRazonDev("");
   }
   function save() {
     if (!form.precioBase) return;
@@ -3565,15 +4080,15 @@ function App() {
   const [sales, setSales] = useState(() => loadData("sales") ?? SEED_SALES);
   const [user, setUser] = useState(null);
   const [view, setView] = useState("dashboard");
+  const [selectedPart, setSelectedPart] = useState(null);
   useEffect(() => {
     if(!window.dbHelpers) return;
-    const unsubs = [
-      window.dbHelpers.listenCollection("sellers", setSellers),
-      window.dbHelpers.listenCollection("clients", setClients),
-      window.dbHelpers.listenCollection("trucks", setTrucks),
-      window.dbHelpers.listenCollection("parts", setParts),
-      window.dbHelpers.listenCollection("sales", setSales),
-    ];
+    const unsubs = [window.dbHelpers.listenCollection("sellers",setSellers),window.dbHelpers.listenCollection("clients",setClients),window.dbHelpers.listenCollection("trucks",setTrucks),window.dbHelpers.listenCollection("parts",setParts),window.dbHelpers.listenCollection("sales",setSales)];
+    return () => unsubs.forEach(u => u && u());
+  }, []);
+  useEffect(() => {
+    if(!window.dbHelpers) return;
+    const unsubs=[window.dbHelpers.listenCollection("sellers",setSellers),window.dbHelpers.listenCollection("clients",setClients),window.dbHelpers.listenCollection("trucks",setTrucks),window.dbHelpers.listenCollection("parts",setParts),window.dbHelpers.listenCollection("sales",setSales)];
     return () => unsubs.forEach(u => u && u());
   }, []);
   useEffect(() => {
@@ -3689,7 +4204,8 @@ function App() {
     parts: parts,
     setParts: setParts,
     trucks: trucks,
-    user: user
+    user: user,
+    onSelectPart: setSelectedPart
   }), view === "unidades" && /*#__PURE__*/React.createElement(UnidadesCompletas, {
     parts: parts,
     setParts: setParts,
@@ -3717,11 +4233,45 @@ function App() {
     parts: parts,
     sales: sales,
     user: user
-  })), /*#__PURE__*/React.createElement("footer", {
+  })),  selectedPart && /*#__PURE__*/React.createElement(Modal, {
+    title: "Ficha: " + selectedPart.nombre,
+    onClose: () => setSelectedPart(null)
+  }, /*#__PURE__*/React.createElement("div", {className:"space-y-4"},
+    /*#__PURE__*/React.createElement("div", {className:"bg-zinc-800 rounded-xl p-4 space-y-2"},
+      /*#__PURE__*/React.createElement("div", {className:"flex items-center gap-2 flex-wrap mb-2"},
+        /*#__PURE__*/React.createElement("span", {className:"font-black text-zinc-100 text-lg"}, selectedPart.nombre),
+        selectedPart.esSuelta && /*#__PURE__*/React.createElement(Badge, {color:"orange"}, "Pieza suelta"),
+        selectedPart.esDevolucion && /*#__PURE__*/React.createElement(Badge, {color:"red"}, "Devolucion"),
+        selectedPart.esChecklist && /*#__PURE__*/React.createElement(Badge, {color:"purple"}, "Sistema completo")
+      ),
+      selectedPart.marca && /*#__PURE__*/React.createElement("div", {className:"flex justify-between text-sm py-1 border-b border-zinc-700"}, /*#__PURE__*/React.createElement("span", {className:"text-zinc-400"}, "Marca"), /*#__PURE__*/React.createElement("span", {className:"text-zinc-100 font-semibold"}, selectedPart.marca)),
+      selectedPart.modelo && /*#__PURE__*/React.createElement("div", {className:"flex justify-between text-sm py-1 border-b border-zinc-700"}, /*#__PURE__*/React.createElement("span", {className:"text-zinc-400"}, "Modelo"), /*#__PURE__*/React.createElement("span", {className:"text-zinc-100"}, selectedPart.modelo)),
+      selectedPart.libraje && /*#__PURE__*/React.createElement("div", {className:"flex justify-between text-sm py-1 border-b border-zinc-700"}, /*#__PURE__*/React.createElement("span", {className:"text-zinc-400"}, "Libraje"), /*#__PURE__*/React.createElement("span", {className:"text-zinc-100"}, selectedPart.libraje)),
+      selectedPart.serieChasis && /*#__PURE__*/React.createElement("div", {className:"flex justify-between text-sm py-1 border-b border-zinc-700"}, /*#__PURE__*/React.createElement("span", {className:"text-zinc-400"}, "No. Serie Chasis"), /*#__PURE__*/React.createElement("span", {className:"text-zinc-100"}, selectedPart.serieChasis)),
+      /*#__PURE__*/React.createElement("div", {className:"flex justify-between text-sm py-1 border-b border-zinc-700"}, /*#__PURE__*/React.createElement("span", {className:"text-zinc-400"}, "Condicion"), /*#__PURE__*/React.createElement("span", {className:"font-bold text-amber-400"}, condLabel(selectedPart.condicion))),
+      /*#__PURE__*/React.createElement("div", {className:"flex justify-between py-1 border-b border-zinc-700"}, /*#__PURE__*/React.createElement("span", {className:"text-sm text-zinc-400"}, "Precio"), /*#__PURE__*/React.createElement("span", {className:"text-xl font-black text-amber-400"}, fmt(adj(selectedPart.precioBase, selectedPart.condicion)))),
+      /*#__PURE__*/React.createElement("div", {className:"flex justify-between text-sm py-1"}, /*#__PURE__*/React.createElement("span", {className:"text-zinc-400"}, "Precio minimo"), /*#__PURE__*/React.createElement("span", {className:"text-red-400 font-bold"}, fmt(selectedPart.precioMinimo))),
+      selectedPart.creadoPor && /*#__PURE__*/React.createElement("p", {className:"text-xs text-zinc-500 mt-2"}, "Registrado por ", selectedPart.creadoPor, " · ", selectedPart.fechaIngreso),
+      selectedPart.esDevolucion && /*#__PURE__*/React.createElement("p", {className:"text-xs text-red-400 mt-1"}, "↩ Devolucion: ", selectedPart.razonDevolucion)
+    ),
+    selectedPart.ubicacion ? /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("p", {className:"text-xs font-bold text-zinc-400 uppercase mb-2"}, "Ubicacion en el negocio"),
+      /*#__PURE__*/React.createElement(MiniMapa, {ubicacion: selectedPart.ubicacion})
+    ) : /*#__PURE__*/React.createElement("p", {className:"text-xs text-zinc-600 text-center py-2"}, "Sin ubicacion asignada")
+  )),
+  /*#__PURE__*/React.createElement("footer", {
     className: "border-t border-zinc-800 py-3 text-center text-zinc-700 text-xs"
   }, "Deshuesadero - Sistema de Inventario"));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+
+
+
+
+
+
+
+
 
 </script>
 </body>
